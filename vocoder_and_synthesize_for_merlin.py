@@ -23,11 +23,13 @@ fs_alpha_dict = {16000: 0.58,
 
 raw_dir = "raw"
 sp_dir = "sp"
-mgc_dir = "mgc"
-bap_dir = "bap"
 ap_dir = "ap"
 f0_dir = "f0"
+# output feature dir
 lf0_dir = "lf0"
+mgc_dir = "mgc"
+bap_dir = "bap"
+
 # out_feat_dir must contain all of above feature name
 feat_dir = ["raw", "sp", "mgc", "bap", "ap", "f0", "lf0"]
 
@@ -56,7 +58,6 @@ def extract_vocoder_feats_for_merlin(merlin_path, vocoder_type, wav_dir, out_dir
     file_util.create_path_list(path_list)
     print("--- Feature extraction started ---")
     start_time = time.time()
-
     # get wav files list
     wav_files = file_util.read_file_list_from_path(wav_dir, ".wav", True)
     process = None
@@ -67,7 +68,13 @@ def extract_vocoder_feats_for_merlin(merlin_path, vocoder_type, wav_dir, out_dir
         process = extract_feats_by_straight
         params = [straight, sptk, wav_files, sample_rate]
     elif vocoder_type == "world":
-
+        process = extract_feat_by_world
+        params = [wav_files, sample_rate]
+    elif vocoder_type == "worldv2":
+        process = extract_feat_by_worldv2
+        params = [wav_files, sample_rate]
+    else:
+        log.error("current vocoder not supported " + vocoder_type)
     # do multi-processing
     pool = mp.Pool(mp.cpu_count())
     pool.map(process, params)
@@ -241,6 +248,116 @@ def extract_feat_by_worldv2(wav_file, sample_rate):
     os.system(sptk_x2x_df_cmd2)
 
 
+def synthesis_by_straight(lf0, mgc, bap, synth_dir, sample_rate):
+    '''
+
+    :param lf0:
+    :param mgc:
+    :param bap:
+    :param synth_dir:
+    :return:
+    '''
+    mcsize = 59
+    order = 24
+    nFFT = fs_nFFT_dict[sample_rate]
+    alpha = fs_alpha_dict[sample_rate]
+    nFFTHalf = (1 + nFFT / 2)
+    fshift = 5
+    file_id = os.path.basename(lf0).split(".")[0]
+    ### convert lf0 to f0 ###
+    f0_file = os.path.join(synth_dir, file_id + ".f0")
+    lf0_f0_cmd = "sptk/sopr -magic -1.0E+10 -EXP -MAGIC 0.0 %s | %s +fa > %s" % \
+                 (os.path.join(sptk, "sopr"), lf0, os.path.join(sptk, "x2x"), f0_file)
+
+    os.system(lf0_f0_cmd)
+    ### convert mgc to sp ###
+    sp_file = os.path.join(synth_dir, file_id + ".sp")
+    mgc_to_sp = "%s -a %d -g 0 -m %d -l %d -o 2 %s > $resyn_dir/$file_id.sp" % \
+                (os.path.join(sptk, "mgc2sp"), alpha, mcsize, nFFT, mgc, sp_file)
+    os.system(mgc_to_sp)
+    ### convert bap to ap ###
+    ap_file = os.path.join(synth_dir, file_id + ".ap")
+    mgc_to_sp = "%s -a %d -g 0 -m %d -l %d -o 0 %s > $resyn_dir/$file_id.bap" % \
+                (os.path.join(sptk, "mgc2sp"), alpha, order, nFFT, bap, ap_file)
+    os.system(mgc_to_sp)
+    ## synthesis
+    wav_file = os.path.join(synth_dir, file_id + ".wav")
+    synthesis_cmd = "%s -f %d  -spec -fftl %d  -shift %d  -sigp 1.2 -cornf 4000 -float -apfile %s %s %s %s" \
+                    % (os.path.join(straight, "synthesis_fft"), sample_rate, nFFT, fshift, ap_file, f0_file, sp_file,
+                       wav_file)
+    os.system(synthesis_cmd)
+    log.info("synthesized speech in " + wav_file)
+
+
+def synthesis_by_worldv2(lf0, mgc, synth_dir, sample_rate):
+    '''
+            synthesis speech by world v2
+    :param lf0:         one lf0 file path
+    :param mgc:         one mgc file path
+    :param bap:         one bap file path
+    :param synth_dir:   where should the synthesized speech should be saved into
+    :param sample_rate:
+    :return:
+    '''
+    mcsize = 59
+    order = 4
+    nFFT = fs_nFFT_dict[sample_rate]
+    alpha = fs_alpha_dict[sample_rate]
+    file_id = os.path.basename(lf0).split(".")[0]
+    f0a = os.path.join(synth_dir, file_id + ".f0a")
+    f0 = os.path.join(synth_dir, file_id + ".f0")
+    lf0_to_f0(lf0, f0)
+    sp = os.path.join(synth_dir, file_id + ".sp")
+    ap = os.path.join(synth_dir, file_id + ".ap")
+    wav_file = os.path.join(synth_dir, file_id + ".wav")
+    mgc_to_apsp(alpha, mcsize, nFFT, mgc, sp)
+    mgc_to_apsp(alpha, order, nFFT, sp, ap)
+    synth_cmd = "%s %d %d  %s %s %s %s " % \
+                (os.path.join(world, "synth"), nFFT, sample_rate, f0, sp, ap, wav_file)
+    os.system(synth_cmd)
+    log.info("synthesize speech in " + wav_file)
+
+
+def synthesis_by_world(lf0, mgc, bap, synth_dir, sample_rate):
+    '''
+            synthesize speech by world
+    :param lf0:
+    :param mgc:
+    :param bap:
+    :param synth_dir:
+    :param sample_rate:
+    :return:
+    '''
+    mcsize = 59
+    # set to True if synthesizing generated files
+    post_filtering = False
+    # this coefficient depends on voice
+    pf_coef = 1.07
+    alpha = fs_alpha_dict[sample_rate]
+    nFFTHalf = fs_nFFT_dict[sample_rate]
+
+    file_id = os.path.basename(lf0).split(".")[0]
+    f0a = os.path.join(synth_dir, file_id + ".f0a")
+    f0 = os.path.join(synth_dir, file_id + ".f0")
+    lf0_to_f0(lf0, f0)
+    if post_filtering:
+        ### post-filtering mgc ###
+        mgcp = os.path.join(synth_dir, file_id + ".mgc_p")
+        mcpf_cmd = "%s -m %d -b %f %s > %s" % (os.path.join(sptk, "mcpf"), mcsize, pf_coef, mgc, mgcp)
+        os.system(mcpf_cmd)
+    ### convert mgc to sp ###
+    sp_file = os.path.join(synth_dir, file_id + ".sp")
+    mgc_to_apsp(alpha, mcsize, nFFTHalf, mgc, sp_file)
+    ### convert bapd to bap ###
+    bapd = os.path.join(synth_dir, file_id + ".bapd")
+    x2x_cmd2 = "%s +fd %s > %s" % (os.path.join(sptk, "x2x"), bap, bapd)
+    os.system(x2x_cmd2)
+    # Final synthesis using WORLD
+    wav_file = os.path.join(synth_dir, file_id + ".wav")
+    synth_cmd = "%s %d %d  %s %s %s %s " % \
+                (os.path.join(world, "synth"), nFFTHalf, sample_rate, f0, sp_file, bapd, wav_file)
+    os.system(synth_cmd)
+
 def sptk_mcep_cmd(cmd_order, alpha, mcsize, nFFT, file_in, file_out):
     '''
 
@@ -266,7 +383,6 @@ def world_analysis(wav_file, f0_file, out1, out2):
     :param out2:        for worldv2 is ".ap", for world is ".bapd"
     :return:
     '''
-    file_id = os.path.basename(wav_file).split(".")[0]
     world_analysis_cmd = "%s %s %s %s %s" % (os.path.join(world, 'analysis'), wav_file, f0_file, out1, out2)
     os.system(world_analysis_cmd)
 
@@ -284,6 +400,41 @@ def f0_to_lf0(f0_file, lf0_file):
     os.system(sptk_x2x_af_cmd)
 
 
+def lf0_to_f0(lf0_file, f0_file):
+    '''
+            convert lf0 file to f0
+    :param lf0_file:
+    :param f0_file:
+    :return:
+    '''
+    f0a = lf0_file.replace(".lf0", "f0a")
+    lf0_f0_cmd1 = "%s -magic -1.0E+10 -EXP -MAGIC 0.0 %s | %s +fa > %s" % \
+                  (os.path.join(sptk, "sopr"), lf0_file, os.path.join(sptk, "x2x"), f0a)
+    lf0_f0_cmd2 = "%s +ad %s %s" % \
+                  (os.path.join(sptk, "x2x"), f0a, f0_file)
+    os.system(lf0_f0_cmd1)
+    os.system(lf0_f0_cmd2)
+
+
+def mgc_to_apsp(alpha, mcsize, nFFTHalf, mgc, apsp):
+    '''
+      convert mgc to sp: $sptk/mgc2sp -a $alpha -g 0 -m $mcsize -l $nFFTHalf -o 2 ${mgc_dir}/$file_id.mgc |
+                             $sptk/sopr -d 32768.0 -P | $sptk/x2x +fd > ${resyn_dir}/$file_id.resyn.sp
+      convert bap to ap: $sptk/mgc2sp -a $alpha -g 0 -m $order -l $nFFTHalf -o 2 ${bap_dir}/$file_id.bap |
+                            $sptk/sopr -d 32768.0 -P | $sptk/x2x +fd > ${resyn_dir}/$file_id.resyn.ap
+    :param alpha:
+    :param mcsize:         mcsize for mgc to sp / order for  bap to ap
+    :param nFFTHalf:
+    :param mgc:             mgc file or bap file
+    :param apsp:            ap for mgc to ap / sp for mgc to sp
+    :return:
+    '''
+    mgc2sp_cmd = "%s -a %f -g 0 -m  %d -l %d -o 2 %s | %s -d 32768.0 -P | %s +fd > %s" % \
+                 (os.path.join(sptk, "mgc2sp"), alpha, mcsize, nFFTHalf, mgc, os.path.join(sptk, "sopr"),
+                  os.path.join(sptk, "x2x"), apsp)
+    os.system(mgc2sp_cmd)
+
+
 def sp_to_mgc(sp_file, mgc_file, alpha, mcsize, nFFTHalf):
     '''
 
@@ -291,7 +442,6 @@ def sp_to_mgc(sp_file, mgc_file, alpha, mcsize, nFFTHalf):
     :param mgc_file:
     :return:
     '''
-
     sptk_x2x_df_cmd1 = "%s +df %s | %s | %s >%s" % (os.path.join(sptk, 'x2x'), \
                                                     sp_file, \
                                                     os.path.join(sptk, 'sopr') + ' -R -m 32768.0', \
@@ -300,7 +450,6 @@ def sp_to_mgc(sp_file, mgc_file, alpha, mcsize, nFFTHalf):
                                                         nFFTHalf) + ' -e 1.0E-8 -j 0 -f 0.0 -q 3 ', \
                                                     mgc_file)
     os.system(sptk_x2x_df_cmd1)
-
 
 #########used for world vocoder #######
 
