@@ -91,7 +91,6 @@ def extract_feats_by_magphase(magphase, wav_dir, out_dir):
     :param out_dir:
     :return:
     '''
-    # magphase = os.path.join(merlin_dir, 'tools', 'magphase', 'src')
     sys.path.append(os.path.realpath(magphase))
     lu.mkdir(out_dir)
     l_wavfiles = file_util.read_file_list_from_path(wav_dir, file_type=".wav", if_recursive=True)
@@ -160,20 +159,13 @@ def extract_feats_by_straight(straight, sptk, wav_file, sample_rate):
     f0_to_lf0(f0_file, lf0_file)
 
     ### convert sp to mgc ###
-    sptk_mcep = "%s -a %s -m %s -l %s -e 1.0E-8 -j 0 -f 0.0 -q 3 %s > %s" % (os.path.join(sptk, 'mcep'), \
-                                                                             alpha, mcsize, nFFT, \
-                                                                             os.path.join(sp_dir, file_id + '.sp'), \
-                                                                             os.path.join(mgc_dir, file_id + '.mgc'))
-    os.system(sptk_mcep)
-
+    file_in = os.path.join(sp_dir, file_id + '.sp')
+    file_out = os.path.join(mgc_dir, file_id + '.mgc')
+    sptk_mcep_cmd(3, alpha, mcsize, nFFT, file_in, file_out)
     ### convert ap to bap ###
-    sptk_mcep = "%s -a %s -m %s -l %s -e 1.0E-8 -j 0 -f 0.0 -q 1 %s > %s" % (os.path.join(sptk, 'mcep'), \
-                                                                             alpha, order, nFFT, \
-                                                                             os.path.join(ap_dir, file_id + '.ap'), \
-                                                                             os.path.join(bap_dir, file_id + '.bap'))
-
-    os.system(sptk_mcep)
-
+    file_in = os.path.join(ap_dir, file_id + '.ap')
+    file_out = os.path.join(bap_dir, file_id + '.bap')
+    sptk_mcep_cmd(1, alpha, mcsize, nFFT, file_in, file_out)
 
 def extract_feat_by_world(wav_file, sample_rate, b_use_reaper=True):
     ''''''
@@ -190,13 +182,10 @@ def extract_feat_by_world(wav_file, sample_rate, b_use_reaper=True):
     f0_world_file = f0_file
     if b_use_reaper:
         f0_world_file = f0_file + "_world"
-
-    world_analysis_cmd = "%s %s %s %s %s" % (os.path.join(world, 'analysis'), \
-                                             wav_file,
-                                             f0_world_file, \
-                                             os.path.join(sp_dir, file_id + '.sp'), \
-                                             os.path.join(bap_dir, file_id + '.bapd'))
-    os.system(world_analysis_cmd)
+    f0_file = os.path.join(f0_dir, file_id + '.f0')
+    sp_file = os.path.join(sp_dir, file_id + '.sp')
+    bapd_file = os.path.join(bap_dir, file_id + '.bapd')
+    world_analysis(wav_file, f0_file, sp_file, bapd_file)
     ### Extract f0 using reaper ###
     if b_use_reaper:
         reaper_f0_extract(wav_file, f0_world_file, f0_file)
@@ -230,13 +219,9 @@ def extract_feat_by_worldv2(wav_file, sample_rate):
     file_id = os.path.basename(wav_file).split(".")[0]
     print('\n' + file_id)
     f0_file = os.path.join(f0_dir, file_id + '.f0')
-    world_analysis_cmd = "%s %s %s %s %s" % (os.path.join(world, 'analysis'), \
-                                             wav_file,
-                                             f0_file, \
-                                             os.path.join(sp_dir, file_id + '.sp'), \
-                                             os.path.join(bap_dir, file_id + '.ap'))
-    os.system(world_analysis_cmd)
-
+    sp_file = os.path.join(sp_dir, file_id + '.sp')
+    ap_file = os.path.join(bap_dir, file_id + '.ap')
+    world_analysis(wav_file, f0_file, sp_file, ap_file)
     ### convert f0 to lf0 ###
     f0_file = os.path.join(f0_dir, file_id + '.f0')
     lf0_file = os.path.join(lf0_dir, file_id + '.lf0')
@@ -255,6 +240,35 @@ def extract_feat_by_worldv2(wav_file, sample_rate):
                                                     os.path.join(mgc_dir, file_id + '.bap'))
     os.system(sptk_x2x_df_cmd2)
 
+
+def sptk_mcep_cmd(cmd_order, alpha, mcsize, nFFT, file_in, file_out):
+    '''
+
+    :param cmd_order:  3 or 1
+    :param alpha:
+    :param mcsize:
+    :param nFFT:
+    :param file_in:
+    :param file_out:
+    :return:
+    '''
+    sptk_mcep = "%s -a %s -m %s -l %s -e 1.0E-8 -j 0 -f 0.0 -q %d %s > %s" \
+                % (os.path.join(sptk, 'mcep'), alpha, mcsize, nFFT, int(cmd_order), file_in, file_out)
+    os.system(sptk_mcep)
+
+
+def world_analysis(wav_file, f0_file, out1, out2):
+    '''
+        world analysis process,both for world and worldv2
+    :param wav_file:       original wav file
+    :param f0_file:
+    :param out1:        ".sp" file
+    :param out2:        for worldv2 is ".ap", for world is ".bapd"
+    :return:
+    '''
+    file_id = os.path.basename(wav_file).split(".")[0]
+    world_analysis_cmd = "%s %s %s %s %s" % (os.path.join(world, 'analysis'), wav_file, f0_file, out1, out2)
+    os.system(world_analysis_cmd)
 
 def f0_to_lf0(f0_file, lf0_file):
     '''
@@ -308,7 +322,7 @@ def reaper_f0_extract(in_wavfile, f0_file_ref, f0_file_out, frame_shift_ms=5.0):
     '''
 
     # Run REAPER:
-    print("Running REAPER f0 extraction...")
+    log.debug("Running REAPER f0 extraction...")
     cmd = "%s -a -s -x 400 -m 50 -u %1.4f -i %s -f %s" % (
         os.path.join(reaper, 'reaper'), frame_shift_ms / 1000.0, in_wavfile, f0_file_out + "_reaper")
     os.system(cmd)
