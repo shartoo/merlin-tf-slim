@@ -6,8 +6,8 @@ import time
 
 import numpy as np
 
-from tool_packages.magphase import libutils as lu
-from tool_packages.magphase import magphase as mp
+# from tool_packages.magphase import libutils as lu
+# from tool_packages.magphase import magphase as mp
 from util import file_util, log_util
 
 log = log_util.get_logger("extract vocoder features")
@@ -21,19 +21,19 @@ fs_alpha_dict = {16000: 0.58,
                  44100: 0.76,
                  48000: 0.77}
 
-raw_dir = "raw"
-sp_dir = "sp"
-ap_dir = "ap"
-f0_dir = "f0"
+raw_dir = "/home/top/workspace/tts/data/CarNum/raw"
+sp_dir = "/home/top/workspace/tts/data/CarNum/sp"
+ap_dir = "/home/top/workspace/tts/data/CarNum/ap"
+f0_dir = "/home/top/workspace/tts/data/CarNum/f0"
 # output feature dir
-lf0_dir = "lf0"
-mgc_dir = "mgc"
-bap_dir = "bap"
+lf0_dir = "/home/top/workspace/tts/data/CarNum/lf0"
+mgc_dir = "/home/top/workspace/tts/data/CarNum/mgc"
+bap_dir = "/home/top/workspace/tts/data/CarNum/bap"
 
 # out_feat_dir must contain all of above feature name
 feat_dir = ["raw", "sp", "mgc", "bap", "ap", "f0", "lf0"]
 
-merlin_dir = ""
+merlin_dir = "/home/top/workspace/tts/merlin-tf-slim"
 straight = os.path.join(merlin_dir, "tools/bin/straight")
 world = os.path.join(merlin_dir, "tools/bin/WORLD")
 worldv2 = os.path.join(merlin_dir, "tools/bin/WORLD")
@@ -113,7 +113,7 @@ def extract_feats_by_magphase(magphase, wav_dir, out_dir):
     lu.run_multithreaded(feat_extraction, l_wavfiles, out_dir)
 
 
-def extract_feats_by_straight(straight, sptk, wav_file, sample_rate):
+def extract_feats_by_straight(straight, wav_file, sample_rate):
     '''
         extract vocoder feature by straight
     :param merlin_dir:
@@ -227,19 +227,18 @@ def extract_feat_by_worldv2(wav_file, sample_rate):
     print('\n' + file_id)
     f0_file = os.path.join(f0_dir, file_id + '.f0')
     sp_file = os.path.join(sp_dir, file_id + '.sp')
-    ap_file = os.path.join(bap_dir, file_id + '.ap')
+    ap_file = os.path.join(ap_dir, file_id + '.ap')
     world_analysis(wav_file, f0_file, sp_file, ap_file)
     ### convert f0 to lf0 ###
     f0_file = os.path.join(f0_dir, file_id + '.f0')
     lf0_file = os.path.join(lf0_dir, file_id + '.lf0')
     f0_to_lf0(f0_file, lf0_file)
     ### convert sp to mgc ###
-    sp_file = os.path.join(sp_dir, file_id + '.sp')
     mgc_file = os.path.join(mgc_dir, file_id + '.mgc')
     sp_to_mgc(sp_file, mgc_file, alpha, mcsize, nFFTHalf)
     ### convert ap to bap ###
     sptk_x2x_df_cmd2 = "%s +df %s | %s | %s >%s" % (os.path.join(sptk, 'x2x'), \
-                                                    os.path.join(sp_dir, file_id + '.ap'), \
+                                                    ap_file, \
                                                     os.path.join(sptk, 'sopr') + ' -R -m 32768.0', \
                                                     os.path.join(sptk, 'mcep') + ' -a ' + str(alpha) + ' -m ' + str(
                                                         order) + ' -l ' + str(
@@ -393,8 +392,11 @@ def f0_to_lf0(f0_file, lf0_file):
     :param lf0_file:
     :return:
     '''
+    f0a = f0_file.replace(".f0",".f0a")
+    sptk_f0_to_f0a = "%s +da %s>%s"%(os.path.join(sptk, 'x2x'),f0_file,f0a)
+    os.system(sptk_f0_to_f0a)
     sptk_x2x_af_cmd = "%s +af %s | %s > %s " % (os.path.join(sptk, 'x2x'), \
-                                                f0_file, \
+                                                f0a, \
                                                 os.path.join(sptk, 'sopr') + ' -magic 0.0 -LN -MAGIC -1.0E+10', \
                                                 lf0_file)
     os.system(sptk_x2x_af_cmd)
@@ -407,10 +409,10 @@ def lf0_to_f0(lf0_file, f0_file):
     :param f0_file:
     :return:
     '''
-    f0a = lf0_file.replace(".lf0", "f0a")
+    f0a = lf0_file.replace(".lf0", ".f0a")
     lf0_f0_cmd1 = "%s -magic -1.0E+10 -EXP -MAGIC 0.0 %s | %s +fa > %s" % \
                   (os.path.join(sptk, "sopr"), lf0_file, os.path.join(sptk, "x2x"), f0a)
-    lf0_f0_cmd2 = "%s +ad %s %s" % \
+    lf0_f0_cmd2 = "%s +ad %s >%s" % \
                   (os.path.join(sptk, "x2x"), f0a, f0_file)
     os.system(lf0_f0_cmd1)
     os.system(lf0_f0_cmd2)
@@ -488,3 +490,12 @@ def reaper_f0_extract(in_wavfile, f0_file_ref, f0_file_out, frame_shift_ms=5.0):
     # Save f0 file:
     file_util.write_binfile(v_f0, f0_file_out)
     return
+
+wav_file = "/home/top/workspace/tts/data/CarNum/wav/N_10.wav"
+sample_rate = 16000
+#extract_feat_by_worldv2(wav_file, sample_rate)
+lf0="/home/top/workspace/tts/data/CarNum/lf0/N_10.lf0"
+mgc = "/home/top/workspace/tts/data/CarNum/mgc/N_10.mgc"
+bap = "/home/top/workspace/tts/data/CarNum/bap/N_10.bap"
+synth_dir = "/home/top/workspace/tts/data/CarNum/synth/"
+synthesis_by_worldv2(lf0, mgc, synth_dir, sample_rate)

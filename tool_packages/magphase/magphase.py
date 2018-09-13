@@ -9,8 +9,8 @@ import os
 import warnings
 from subprocess import call
 
-import libaudio as la
-import libutils as lu
+from tool_packages.magphase import libaudio as la
+from tool_packages.magphase import libutils as lu
 # ==============================================================================
 # IMPORTS
 # ==============================================================================

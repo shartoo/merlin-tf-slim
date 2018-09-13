@@ -8,7 +8,7 @@ import os
 from configparser import SafeConfigParser
 from subprocess import call
 
-import libutils as lu
+from tool_packages.magphase import libutils as lu
 import numpy as np
 import soundfile as sf
 from scipy import interpolate
