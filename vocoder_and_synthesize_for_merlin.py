@@ -8,7 +8,7 @@ import numpy as np
 
 # from tool_packages.magphase import libutils as lu
 # from tool_packages.magphase import magphase as mp
-from util import file_util, log_util
+from util import file_util, log_util, system_cmd_util
 
 log = log_util.get_logger("extract vocoder features")
 
@@ -163,16 +163,16 @@ def extract_feats_by_straight(straight, wav_file, sample_rate):
     ### convert f0 to lf0 ###
     f0_file = os.path.join(f0_dir, file_id + '.f0')
     lf0_file = os.path.join(lf0_dir, file_id + '.lf0')
-    f0_to_lf0(f0_file, lf0_file)
+    system_cmd_util.sptk_f0_to_lf0(sptk, f0_file, lf0_file)
 
     ### convert sp to mgc ###
     file_in = os.path.join(sp_dir, file_id + '.sp')
     file_out = os.path.join(mgc_dir, file_id + '.mgc')
-    sptk_mcep_cmd(3, alpha, mcsize, nFFT, file_in, file_out)
+    system_cmd_util.sptk_mcep_cmd(sptk, 3, alpha, mcsize, nFFT, file_in, file_out)
     ### convert ap to bap ###
     file_in = os.path.join(ap_dir, file_id + '.ap')
     file_out = os.path.join(bap_dir, file_id + '.bap')
-    sptk_mcep_cmd(1, alpha, mcsize, nFFT, file_in, file_out)
+    system_cmd_util.sptk_mcep_cmd(sptk, 1, alpha, mcsize, nFFT, file_in, file_out)
 
 def extract_feat_by_world(wav_file, sample_rate, b_use_reaper=True):
     ''''''
@@ -192,18 +192,18 @@ def extract_feat_by_world(wav_file, sample_rate, b_use_reaper=True):
     f0_file = os.path.join(f0_dir, file_id + '.f0')
     sp_file = os.path.join(sp_dir, file_id + '.sp')
     bapd_file = os.path.join(bap_dir, file_id + '.bapd')
-    world_analysis(wav_file, f0_file, sp_file, bapd_file)
+    system_cmd_util.world_analysis(world, wav_file, f0_file, sp_file, bapd_file)
     ### Extract f0 using reaper ###
     if b_use_reaper:
         reaper_f0_extract(wav_file, f0_world_file, f0_file)
     ### convert f0 to lf0 ###
     f0_file = os.path.join(f0_dir, file_id + '.f0')
     lf0_file = os.path.join(lf0_dir, file_id + '.lf0')
-    f0_to_lf0(f0_file, lf0_file)
+    system_cmd_util.sptk_f0_to_lf0(sptk, f0_file, lf0_file)
     ### convert sp to mgc ###
     sp_file = os.path.join(sp_dir, file_id + '.sp')
     mgc_file = os.path.join(mgc_dir, file_id + '.mgc')
-    sp_to_mgc(sp_file, mgc_file, alpha, mcsize, nFFTHalf)
+    system_cmd_util.sptk_sp_to_mgc(sptk, sp_file, mgc_file, alpha, mcsize, nFFTHalf)
 
     ### convert bapd to bap ###
     sptk_x2x_df_cmd2 = "%s +df %s > %s " % (os.path.join(sptk, "x2x"), \
@@ -228,14 +228,14 @@ def extract_feat_by_worldv2(wav_file, sample_rate):
     f0_file = os.path.join(f0_dir, file_id + '.f0')
     sp_file = os.path.join(sp_dir, file_id + '.sp')
     ap_file = os.path.join(ap_dir, file_id + '.ap')
-    world_analysis(wav_file, f0_file, sp_file, ap_file)
+    system_cmd_util.world_analysis(world, wav_file, f0_file, sp_file, ap_file)
     ### convert f0 to lf0 ###
     f0_file = os.path.join(f0_dir, file_id + '.f0')
     lf0_file = os.path.join(lf0_dir, file_id + '.lf0')
-    f0_to_lf0(f0_file, lf0_file)
+    system_cmd_util.sptk_f0_to_lf0(sptk, f0_file, lf0_file)
     ### convert sp to mgc ###
     mgc_file = os.path.join(mgc_dir, file_id + '.mgc')
-    sp_to_mgc(sp_file, mgc_file, alpha, mcsize, nFFTHalf)
+    system_cmd_util.sptk_sp_to_mgc(sptk, sp_file, mgc_file, alpha, mcsize, nFFTHalf)
     ### convert ap to bap ###
     sptk_x2x_df_cmd2 = "%s +df %s | %s | %s >%s" % (os.path.join(sptk, 'x2x'), \
                                                     ap_file, \
@@ -305,12 +305,12 @@ def synthesis_by_worldv2(lf0, mgc, synth_dir, sample_rate):
     file_id = os.path.basename(lf0).split(".")[0]
     f0a = os.path.join(synth_dir, file_id + ".f0a")
     f0 = os.path.join(synth_dir, file_id + ".f0")
-    lf0_to_f0(lf0, f0)
+    system_cmd_util.sptk_lf0_to_f0(sptk, lf0, f0)
     sp = os.path.join(synth_dir, file_id + ".sp")
     ap = os.path.join(synth_dir, file_id + ".ap")
     wav_file = os.path.join(synth_dir, file_id + ".wav")
-    mgc_to_apsp(alpha, mcsize, nFFT, mgc, sp)
-    mgc_to_apsp(alpha, order, nFFT, sp, ap)
+    system_cmd_util.sptk_mgc_to_apsp(sptk, alpha, mcsize, nFFT, mgc, sp)
+    system_cmd_util.sptk_mgc_to_apsp(sptk, alpha, order, nFFT, sp, ap)
     synth_cmd = "%s %d %d  %s %s %s %s " % \
                 (os.path.join(world, "synth"), nFFT, sample_rate, f0, sp, ap, wav_file)
     os.system(synth_cmd)
@@ -338,7 +338,7 @@ def synthesis_by_world(lf0, mgc, bap, synth_dir, sample_rate):
     file_id = os.path.basename(lf0).split(".")[0]
     f0a = os.path.join(synth_dir, file_id + ".f0a")
     f0 = os.path.join(synth_dir, file_id + ".f0")
-    lf0_to_f0(lf0, f0)
+    system_cmd_util.sptk_lf0_to_f0(sptk, lf0, f0)
     if post_filtering:
         ### post-filtering mgc ###
         mgcp = os.path.join(synth_dir, file_id + ".mgc_p")
@@ -346,7 +346,7 @@ def synthesis_by_world(lf0, mgc, bap, synth_dir, sample_rate):
         os.system(mcpf_cmd)
     ### convert mgc to sp ###
     sp_file = os.path.join(synth_dir, file_id + ".sp")
-    mgc_to_apsp(alpha, mcsize, nFFTHalf, mgc, sp_file)
+    system_cmd_util.sptk_mgc_to_apsp(sptk, alpha, mcsize, nFFTHalf, mgc, sp_file)
     ### convert bapd to bap ###
     bapd = os.path.join(synth_dir, file_id + ".bapd")
     x2x_cmd2 = "%s +fd %s > %s" % (os.path.join(sptk, "x2x"), bap, bapd)
@@ -356,102 +356,6 @@ def synthesis_by_world(lf0, mgc, bap, synth_dir, sample_rate):
     synth_cmd = "%s %d %d  %s %s %s %s " % \
                 (os.path.join(world, "synth"), nFFTHalf, sample_rate, f0, sp_file, bapd, wav_file)
     os.system(synth_cmd)
-
-def sptk_mcep_cmd(cmd_order, alpha, mcsize, nFFT, file_in, file_out):
-    '''
-
-    :param cmd_order:  3 or 1
-    :param alpha:
-    :param mcsize:
-    :param nFFT:
-    :param file_in:
-    :param file_out:
-    :return:
-    '''
-    sptk_mcep = "%s -a %s -m %s -l %s -e 1.0E-8 -j 0 -f 0.0 -q %d %s > %s" \
-                % (os.path.join(sptk, 'mcep'), alpha, mcsize, nFFT, int(cmd_order), file_in, file_out)
-    os.system(sptk_mcep)
-
-
-def world_analysis(wav_file, f0_file, out1, out2):
-    '''
-        world analysis process,both for world and worldv2
-    :param wav_file:       original wav file
-    :param f0_file:
-    :param out1:        ".sp" file
-    :param out2:        for worldv2 is ".ap", for world is ".bapd"
-    :return:
-    '''
-    world_analysis_cmd = "%s %s %s %s %s" % (os.path.join(world, 'analysis'), wav_file, f0_file, out1, out2)
-    os.system(world_analysis_cmd)
-
-def f0_to_lf0(f0_file, lf0_file):
-    '''
-        convert f0 file to lf0
-    :param :f0_file
-    :param lf0_file:
-    :return:
-    '''
-    f0a = f0_file.replace(".f0",".f0a")
-    sptk_f0_to_f0a = "%s +da %s>%s"%(os.path.join(sptk, 'x2x'),f0_file,f0a)
-    os.system(sptk_f0_to_f0a)
-    sptk_x2x_af_cmd = "%s +af %s | %s > %s " % (os.path.join(sptk, 'x2x'), \
-                                                f0a, \
-                                                os.path.join(sptk, 'sopr') + ' -magic 0.0 -LN -MAGIC -1.0E+10', \
-                                                lf0_file)
-    os.system(sptk_x2x_af_cmd)
-
-
-def lf0_to_f0(lf0_file, f0_file):
-    '''
-            convert lf0 file to f0
-    :param lf0_file:
-    :param f0_file:
-    :return:
-    '''
-    f0a = lf0_file.replace(".lf0", ".f0a")
-    lf0_f0_cmd1 = "%s -magic -1.0E+10 -EXP -MAGIC 0.0 %s | %s +fa > %s" % \
-                  (os.path.join(sptk, "sopr"), lf0_file, os.path.join(sptk, "x2x"), f0a)
-    lf0_f0_cmd2 = "%s +ad %s >%s" % \
-                  (os.path.join(sptk, "x2x"), f0a, f0_file)
-    os.system(lf0_f0_cmd1)
-    os.system(lf0_f0_cmd2)
-
-
-def mgc_to_apsp(alpha, mcsize, nFFTHalf, mgc, apsp):
-    '''
-      convert mgc to sp: $sptk/mgc2sp -a $alpha -g 0 -m $mcsize -l $nFFTHalf -o 2 ${mgc_dir}/$file_id.mgc |
-                             $sptk/sopr -d 32768.0 -P | $sptk/x2x +fd > ${resyn_dir}/$file_id.resyn.sp
-      convert bap to ap: $sptk/mgc2sp -a $alpha -g 0 -m $order -l $nFFTHalf -o 2 ${bap_dir}/$file_id.bap |
-                            $sptk/sopr -d 32768.0 -P | $sptk/x2x +fd > ${resyn_dir}/$file_id.resyn.ap
-    :param alpha:
-    :param mcsize:         mcsize for mgc to sp / order for  bap to ap
-    :param nFFTHalf:
-    :param mgc:             mgc file or bap file
-    :param apsp:            ap for mgc to ap / sp for mgc to sp
-    :return:
-    '''
-    mgc2sp_cmd = "%s -a %f -g 0 -m  %d -l %d -o 2 %s | %s -d 32768.0 -P | %s +fd > %s" % \
-                 (os.path.join(sptk, "mgc2sp"), alpha, mcsize, nFFTHalf, mgc, os.path.join(sptk, "sopr"),
-                  os.path.join(sptk, "x2x"), apsp)
-    os.system(mgc2sp_cmd)
-
-
-def sp_to_mgc(sp_file, mgc_file, alpha, mcsize, nFFTHalf):
-    '''
-
-    :param sp_file:
-    :param mgc_file:
-    :return:
-    '''
-    sptk_x2x_df_cmd1 = "%s +df %s | %s | %s >%s" % (os.path.join(sptk, 'x2x'), \
-                                                    sp_file, \
-                                                    os.path.join(sptk, 'sopr') + ' -R -m 32768.0', \
-                                                    os.path.join(sptk, 'mcep') + ' -a ' + str(alpha) + ' -m ' + str(
-                                                        mcsize) + ' -l ' + str(
-                                                        nFFTHalf) + ' -e 1.0E-8 -j 0 -f 0.0 -q 3 ', \
-                                                    mgc_file)
-    os.system(sptk_x2x_df_cmd1)
 
 #########used for world vocoder #######
 

@@ -1,18 +1,20 @@
-import os
 import sys
 
 import numpy
-from binary_io import BinaryIOCollection
 
-io_funcs = BinaryIOCollection()
+from util import file_util
 
 
-def compute_mean_and_std(lf0_file_list):
+def compute_mean_and_std(lf0_dir):
+    '''
+    :param lf0_dir:
+    :return:
+    '''
+    lf0_file_list = file_util.read_file_list_from_path(lf0_dir, file_type=".lf0", if_recursive=True)
     all_files_lf0_arr = numpy.zeros(200000)
-
     current_index = 0
     for lf0_file in lf0_file_list:
-        lf0_arr, frame_number = io_funcs.load_binary_file_frame(lf0_file, 1)
+        lf0_arr, frame_number = file_util.load_binary_file_frame(lf0_file, 1)
         for lf0_value in lf0_arr:
             all_files_lf0_arr[current_index] = numpy.exp(lf0_value)
             current_index += 1
@@ -22,22 +24,7 @@ def compute_mean_and_std(lf0_file_list):
 
     mean_f0 = numpy.mean(all_files_lf0_arr)
     std_f0 = numpy.std(all_files_lf0_arr)
-
     return mean_f0, std_f0
-
-
-def get_lf0_filelist(lf0_dir):
-    lf0_files = []
-    for file in os.listdir(lf0_dir):
-        whole_filepath = os.path.join(lf0_dir, file)
-        if os.path.isfile(whole_filepath) and str(whole_filepath).endswith(".lf0"):
-            lf0_files.append(whole_filepath)
-        elif os.path.isdir(whole_filepath):
-            lf0_files += get_lf0_filelist(whole_filepath)
-
-    lf0_files.sort()
-
-    return lf0_files
 
 
 if __name__ == "__main__":

@@ -8,6 +8,16 @@ from util import log_util
 log = log_util.get_logger("file process")
 
 
+def create_blank_file(file_name):
+    '''
+        create a blank file
+    :param file_name:
+    :return:
+    '''
+    with open(file_name, 'w') as wt:
+        wt.write("")
+    log.debug("blank file %s created.." % file_name)
+
 def read_file_list_from_path(path, file_type=None, if_recursive=False):
     '''
         get all file list from path
@@ -36,6 +46,22 @@ def read_file_list_from_path(path, file_type=None, if_recursive=False):
     file_list.sort()
     return file_list
 
+
+def read_file_by_line(filename):
+    '''
+        read every line of a file
+    :param filename: file to read
+    :return:        list of line content in file
+    '''
+    line_list = []
+    with open(filename, 'r') as rd:
+        lines = rd.readlines()
+        for line in lines:
+            line = line.strip()
+            if len(line) < 1:
+                continue
+            line_list.append(line)
+    return line_list
 
 def write2file(content, save_file):
     '''
@@ -117,6 +143,34 @@ def write_binfile(m_data, filename, dtype=np.float64):
     return
 
 
+def load_binary_file(self, file_name, dimension):
+    fid_lab = open(file_name, 'rb')
+    features = np.fromfile(fid_lab, dtype=np.float32)
+    fid_lab.close()
+    assert features.size % float(dimension) == 0.0, 'specified dimension not compatible with data'
+    features = features[:(dimension * (features.size / dimension))]
+    features = features.reshape((-1, dimension))
+
+    return features
+
+
+def array_to_binary_file(self, data, output_file_name):
+    data = np.array(data, 'float32')
+    fid = open(output_file_name, 'wb')
+    data.tofile(fid)
+    fid.close()
+
+
+def load_binary_file_frame(self, file_name, dimension):
+    fid_lab = open(file_name, 'rb')
+    features = np.fromfile(fid_lab, dtype=np.float32)
+    fid_lab.close()
+    assert features.size % float(dimension) == 0.0, 'specified dimension not compatible with data'
+    frame_number = features.size / dimension
+    features = features[:(dimension * frame_number)]
+    features = features.reshape((-1, dimension))
+    return features, frame_number
+
 if __name__ == "__main__":
-    list = read_file_list_from_path("D:/公司资料", if_recursive=True)
+    list = read_file_list_from_path("D:/test", if_recursive=True)
     print(list)

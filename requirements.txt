@@ -1,4 +1,5 @@
 numpy
+fastdtw
 scipy
 scikit-learn
 matplotlib

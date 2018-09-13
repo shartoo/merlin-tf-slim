@@ -3,22 +3,28 @@ import os
 import sys
 
 import numpy
-from binary_io import BinaryIOCollection
 
-io_funcs = BinaryIOCollection()
+from util import file_util
 
 
-def read_file_list(file_name):
-    file_lists = []
-    fid = open(file_name)
-    for line in fid.readlines():
-        line = line.strip()
-        if len(line) < 1:
-            continue
-        file_lists.append(line)
-    fid.close()
-
-    return file_lists
+def compute_lf0_mean_and_std(lf0_dir):
+    '''
+    :param lf0_dir:
+    :return:
+    '''
+    lf0_file_list = file_util.read_file_list_from_path(lf0_dir, file_type=".lf0", if_recursive=True)
+    all_files_lf0_arr = numpy.zeros(200000)
+    current_index = 0
+    for lf0_file in lf0_file_list:
+        lf0_arr, frame_number = file_util.load_binary_file_frame(lf0_file, 1)
+        for lf0_value in lf0_arr:
+            all_files_lf0_arr[current_index] = numpy.exp(lf0_value)
+            current_index += 1
+    all_files_lf0_arr = all_files_lf0_arr[all_files_lf0_arr > 0]
+    all_files_lf0_arr = numpy.log(all_files_lf0_arr)
+    mean_f0 = numpy.mean(all_files_lf0_arr)
+    std_f0 = numpy.std(all_files_lf0_arr)
+    return mean_f0, std_f0
 
 
 def prepare_file_path_list(file_id_list, file_dir, file_extension, new_dir_switch=True):
@@ -59,9 +65,9 @@ def transform_lf0_dir(src_lf0_file_list, tgt_lf0_file_list, stats_dict):
 
 
 def transform_lf0_file(src_lf0_file, tgt_lf0_file, stats_dict):
-    src_lf0_arr, frame_number = io_funcs.load_binary_file_frame(src_lf0_file, 1)
+    src_lf0_arr, frame_number = file_util.load_binary_file_frame(src_lf0_file, 1)
     tgt_lf0_arr = transform_f0(src_lf0_arr, stats_dict)
-    io_funcs.array_to_binary_file(tgt_lf0_arr, tgt_lf0_file)
+    file_util.array_to_binary_file(tgt_lf0_arr, tgt_lf0_file)
 
 
 def get_lf0_filelist(lf0_dir):
@@ -135,7 +141,7 @@ if __name__ == "__main__":
     stats_dict['std_tgt'] = tgt_std_f0
 
     if opt.srcdir is not None and opt.tgtdir is not None:
-        file_id_list = read_file_list(opt.filelist)
+        file_id_list = file_util.read_file_by_line(opt.filelist)
         src_lf0_file_list = prepare_file_path_list(file_id_list, opt.srcdir, '.lf0')
         tgt_lf0_file_list = prepare_file_path_list(file_id_list, opt.tgtdir, '.lf0')
 

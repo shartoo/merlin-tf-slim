@@ -14,7 +14,6 @@ class BinaryIOCollection(object):
 
     def array_to_binary_file(self, data, output_file_name):
         data = numpy.array(data, 'float32')
-
         fid = open(output_file_name, 'wb')
         data.tofile(fid)
         fid.close()
@@ -27,5 +26,4 @@ class BinaryIOCollection(object):
         frame_number = features.size / dimension
         features = features[:(dimension * frame_number)]
         features = features.reshape((-1, dimension))
-
         return features, frame_number
