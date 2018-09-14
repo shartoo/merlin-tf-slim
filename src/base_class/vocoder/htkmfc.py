@@ -113,7 +113,13 @@ class HTKFeat_read(object):
     def readvec(self):
         return next(self)
 
-    def getall(self, filename):
+    def getall(self, filename, feature_dimension):
+        '''
+
+        :param filename:
+        :param feature_dimension:  meaningless, just for called by  other function
+        :return:
+        '''
         self.open_file(filename)
         self.readheader()
 

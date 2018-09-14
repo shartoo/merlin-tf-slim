@@ -1,45 +1,34 @@
-import pickle
-import gzip
-import os, sys, errno
-import math
+import errno
 import glob
+import logging  # as logging
+import logging.config
+import math
+import os
+import pickle
 import struct
+import sys
 
+import configuration
 #  numpy & theano imports need to be done in this order (only for some numpy installations, not sure why)
 import numpy
 # we need to explicitly import this in some cases, not sure why this doesn't get imported with numpy itself
 import numpy.distutils.__config__
 # and only after that can we import theano
 import theano
-
+# the new class for label composition and normalisation
+from frontend.label_composer import LabelComposer
 from frontend.label_normalisation import HTSLabelNormalisation
-from frontend.min_max_norm import MinMaxNormalisation
 # from frontend.acoustic_normalisation import CMPNormalisation
-from frontend.acoustic_composition import AcousticComposition
-from frontend.parameter_generation import ParameterGeneration
 # from frontend.feature_normalisation_base import FeatureNormBase
 ##from frontend.mlpg_fast import MLParameterGenerationFast
 from frontend.mlpg import MLParameterGeneration as MLParameterGenerationFast  ## osw temp
-
 from io_funcs.binary_io import BinaryIOCollection
-
-# the new class for label composition and normalisation
-from frontend.label_composer import LabelComposer
-
-import configuration
-
-from models.ms_dnn_gv import MultiStreamDNNGv
-from models.sdae import StackedDenoiseAutoEncoder
-from models.mdn import MixtureDensityNetwork
-
-from utils.learn_rates import ExpDecreaseLearningRate
-
 # import matplotlib.pyplot as plt
 # our custom logging class that can also plot
 # from logplot.logging_plotting import LoggerPlotter, MultipleTimeSeriesPlot, SingleWeightMatrixPlot
-from logplot.logging_plotting import LoggerPlotter, MultipleSeriesPlot, SingleWeightMatrixPlot
-import logging  # as logging
-import logging.config
+from logplot.logging_plotting import LoggerPlotter, SingleWeightMatrixPlot
+
+from util import file_util, math_statis
 
 
 def extract_file_id_list(file_list):
@@ -416,8 +405,8 @@ def main_function(cfg, in_dir, out_dir):
     # no silence removal for synthesis ...
 
     ## minmax norm:
-    min_max_normaliser = MinMaxNormalisation(feature_dimension=lab_dim, min_value=0.01, max_value=0.99)
-
+    min_max_normaliser = math_statis.Statis(feature_dimension=lab_dim, read_func=file_util.load_binary_file_frame,
+                                            writer_func=file_util.array_to_binary_file)
     # reload stored minmax values: (TODO -- move reading and writing into MinMaxNormalisation class)
     fid = open(label_norm_file, 'rb')
 

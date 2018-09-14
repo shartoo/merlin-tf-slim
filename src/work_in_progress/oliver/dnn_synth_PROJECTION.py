@@ -1,45 +1,39 @@
-import pickle
-import os, sys, errno
-import time
-import math
-import glob
-import struct
-
 import copy
+import errno
+import glob
+import logging  # as logging
+import logging.config
+import math
+import os
+import pickle
+import struct
+import sys
+import time
 
-from lxml import etree
-
+import configuration
 #  numpy & theano imports need to be done in this order (only for some numpy installations, not sure why)
 import numpy
 # we need to explicitly import this in some cases, not sure why this doesn't get imported with numpy itself
 import numpy.distutils.__config__
 # and only after that can we import theano
 import theano
-
-from utils.providers import ListDataProviderWithProjectionIndex, get_unexpanded_projection_inputs  # ListDataProvider
-
-from frontend.min_max_norm import MinMaxNormalisation
 # from frontend.acoustic_normalisation import CMPNormalisation
 from frontend.acoustic_composition import AcousticComposition
-from frontend.parameter_generation import ParameterGeneration
-# from frontend.feature_normalisation_base import FeatureNormBase
-from frontend.mean_variance_norm import MeanVarianceNorm
-
-from io_funcs.binary_io import BinaryIOCollection
-
 # the new class for label composition and normalisation
 from frontend.label_composer import LabelComposer
-
-import configuration
-
-from utils.learn_rates import ExpDecreaseLearningRate
-
+from frontend.parameter_generation import ParameterGeneration
+from io_funcs.binary_io import BinaryIOCollection
 # import matplotlib.pyplot as plt
 # our custom logging class that can also plot
 # from logplot.logging_plotting import LoggerPlotter, MultipleTimeSeriesPlot, SingleWeightMatrixPlot
 from logplot.logging_plotting import LoggerPlotter, SingleWeightMatrixPlot
-import logging  # as logging
-import logging.config
+from lxml import etree
+from utils.providers import ListDataProviderWithProjectionIndex, get_unexpanded_projection_inputs  # ListDataProvider
+
+from util import file_util, math_statis
+from util.file_util import load_binary_file_frame
+
+# from frontend.feature_normalisation_base import FeatureNormBase
 
 ## This should always be True -- tidy up later
 expand_by_minibatch = True
@@ -760,9 +754,9 @@ def main_function(cfg, in_dir, out_dir, token_xpath, index_attrib_name, synth_mo
     # no silence removal for synthesis ...
 
     ## minmax norm:
-    min_max_normaliser = MinMaxNormalisation(feature_dimension=lab_dim, min_value=0.01, max_value=0.99,
-                                             exclude_columns=[cfg.index_to_project])
-
+    min_max_normaliser = math_statis.Statis(feature_dimension=lab_dim, read_func=file_util.load_binary_file_frame,
+                                            writer_func=file_util.array_to_binary_file,
+                                            exclude_columns=[cfg.index_to_project])
     (min_vector, max_vector) = retrieve_normalisation_values(label_norm_file)
     min_max_normaliser.min_vector = min_vector
     min_max_normaliser.max_vector = max_vector
@@ -818,8 +812,10 @@ def main_function(cfg, in_dir, out_dir, token_xpath, index_attrib_name, synth_mo
         logger.info('normalising acoustic (output) features using method %s' % cfg.output_feature_normalisation)
         cmp_norm_info = None
         if cfg.output_feature_normalisation == 'MVN':
-            normaliser = MeanVarianceNorm(feature_dimension=cfg.cmp_dim)
-
+            # normaliser = MeanVarianceNorm(feature_dimension=cfg.cmp_dim)
+            read_func = file_util.load_binary_file_frame()
+            normaliser = Statis(feature_dimension=cfg.cmp_dim, read_func=load_binary_file_frame,
+                                writer_func=file_util.array_to_binary_file)
             (mean_vector, std_vector) = retrieve_normalisation_values(norm_info_file)
             normaliser.mean_vector = mean_vector
             normaliser.std_vector = std_vector
@@ -928,14 +924,16 @@ def main_function(cfg, in_dir, out_dir, token_xpath, index_attrib_name, synth_mo
     cmp_min_max = cmp_min_max.reshape((2, -1))
     cmp_min_vector = cmp_min_max[0,]
     cmp_max_vector = cmp_min_max[1,]
-
+    denormaliser = math_statis.Statis(feature_dimension=cfg.cmp_dim, read_func=file_util.load_binary_file_frame,
+                                      writer_func=file_util.array_to_binary_file)
     if cfg.output_feature_normalisation == 'MVN':
-        denormaliser = MeanVarianceNorm(feature_dimension=cfg.cmp_dim)
         denormaliser.feature_denormalisation(gen_file_list, gen_file_list, cmp_min_vector, cmp_max_vector)
 
     elif cfg.output_feature_normalisation == 'MINMAX':
-        denormaliser = MinMaxNormalisation(cfg.cmp_dim, min_value=0.01, max_value=0.99, min_vector=cmp_min_vector,
-                                           max_vector=cmp_max_vector)
+        denormaliser = math_statis.Statis(feature_dimension=cfg.cmp_dim, read_func=file_util.load_binary_file_frame,
+                                          writer_func=file_util.array_to_binary_file,
+                                          min_value=0.01, max_value=0.99, min_vector=cmp_min_vector,
+                                          max_vector=cmp_max_vector)
         denormaliser.denormalise_data(gen_file_list, gen_file_list)
     else:
         logger.critical('denormalising method %s is not supported!\n' % (cfg.output_feature_normalisation))

@@ -20,9 +20,10 @@ TODO: support for options: _C, H_IREFC
 '''
 
 import logging
-import numpy
 import struct
 import sys
+
+import numpy
 
 
 class HTK_Parm_IO(object):

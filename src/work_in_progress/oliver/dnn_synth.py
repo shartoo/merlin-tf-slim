@@ -1,9 +1,10 @@
-import pickle
-import gzip
-import os, sys, errno
-import math
+import errno
 import glob
+import math
+import os
+import pickle
 import struct
+import sys
 
 file_location = os.path.split(os.path.realpath(os.path.abspath(os.path.dirname(__file__))))[0] + '/'
 sys.path.append(file_location + '/../')
@@ -14,13 +15,12 @@ import numpy
 import numpy.distutils.__config__
 # and only after that can we import theano
 import theano
+from util import file_util, math_statis
 
 from frontend.label_normalisation import HTSLabelNormalisation
-from frontend.min_max_norm import MinMaxNormalisation
 # from frontend.acoustic_normalisation import CMPNormalisation
 from frontend.parameter_generation import ParameterGeneration
 # from frontend.feature_normalisation_base import FeatureNormBase
-from frontend.mean_variance_norm import MeanVarianceNorm
 
 from io_funcs.binary_io import BinaryIOCollection
 
@@ -322,8 +322,9 @@ def main_function(cfg, in_dir, out_dir):
     # no silence removal for synthesis ...
 
     ## minmax norm:
-    min_max_normaliser = MinMaxNormalisation(feature_dimension=lab_dim, min_value=0.01, max_value=0.99)
 
+    min_max_normaliser = math_statis.Statis(feature_dimension=lab_dim, read_func=file_util.load_binary_file_frame,
+                                            writer_func=file_util.array_to_binary_file)
     # reload stored minmax values: (TODO -- move reading and writing into MinMaxNormalisation class)
     fid = open(label_norm_file, 'rb')
 
@@ -395,14 +396,16 @@ def main_function(cfg, in_dir, out_dir):
     cmp_min_max = cmp_min_max.reshape((2, -1))
     cmp_min_vector = cmp_min_max[0,]
     cmp_max_vector = cmp_min_max[1,]
-
+    denormaliser = math_statis.Statis(feature_dimension=cfg.cmp_dim, read_func=file_util.load_binary_file_frame,
+                                      writer_func=file_util.array_to_binary_file)
     if cfg.output_feature_normalisation == 'MVN':
-        denormaliser = MeanVarianceNorm(feature_dimension=cfg.cmp_dim)
         denormaliser.feature_denormalisation(gen_file_list, gen_file_list, cmp_min_vector, cmp_max_vector)
 
     elif cfg.output_feature_normalisation == 'MINMAX':
-        denormaliser = MinMaxNormalisation(cfg.cmp_dim, min_value=0.01, max_value=0.99, min_vector=cmp_min_vector,
-                                           max_vector=cmp_max_vector)
+        denormaliser = math_statis.Statis(feature_dimension=cfg.cmp_dim, read_func=file_util.load_binary_file_frame,
+                                          writer_func=file_util.array_to_binary_file,
+                                          min_value=0.01, max_value=0.99, min_vector=cmp_min_vector,
+                                          max_vector=cmp_max_vector)
         denormaliser.denormalise_data(gen_file_list, gen_file_list)
     else:
         logger.critical('denormalising method %s is not supported!\n' % (cfg.output_feature_normalisation))

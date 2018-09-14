@@ -3,7 +3,9 @@ import sys
 import time
 from subprocess import check_call, PIPE
 
-from mean_variance_norm import MeanVarianceNorm
+from htkmfc import HTKFeat_read, HTKFeat_write
+
+from util.math_statis import Statis
 
 # string constants for various shell calls
 STATE_NUM = 5
@@ -35,23 +37,23 @@ class ForcedAlignment(object):
         means = ' '.join(['0.0' for _ in range(39)])
         varg = ' '.join(['1.0' for _ in range(39)])
         fid.write("""~o <VECSIZE> 39 <USER>
-~h "proto"
-<BEGINHMM>
-<NUMSTATES> 7
-""")
+            ~h "proto"
+            <BEGINHMM>
+            <NUMSTATES> 7
+            """)
         for i in range(2, STATE_NUM + 2):
             fid.write('<STATE> {0}\n<MEAN> 39\n{1}\n'.format(i, means))
             fid.write('<VARIANCE> 39\n{0}\n'.format(varg))
         fid.write("""<TRANSP> 7
- 0.0 1.0 0.0 0.0 0.0 0.0 0.0
- 0.0 0.6 0.4 0.0 0.0 0.0 0.0
- 0.0 0.0 0.6 0.4 0.0 0.0 0.0
- 0.0 0.0 0.0 0.6 0.4 0.0 0.0
- 0.0 0.0 0.0 0.0 0.6 0.4 0.0
- 0.0 0.0 0.0 0.0 0.0 0.7 0.3
- 0.0 0.0 0.0 0.0 0.0 0.0 0.0
-<ENDHMM>
-""")
+         0.0 1.0 0.0 0.0 0.0 0.0 0.0
+         0.0 0.6 0.4 0.0 0.0 0.0 0.0
+         0.0 0.0 0.6 0.4 0.0 0.0 0.0
+         0.0 0.0 0.0 0.6 0.4 0.0 0.0
+         0.0 0.0 0.0 0.0 0.6 0.4 0.0
+         0.0 0.0 0.0 0.0 0.0 0.7 0.3
+         0.0 0.0 0.0 0.0 0.0 0.0 0.0
+        <ENDHMM>
+        """)
         fid.close()
 
         ## make vFloors
@@ -119,10 +121,8 @@ class ForcedAlignment(object):
         copy_scp = open(self.copy_scp, 'w')
         check_scp = open(self.train_scp, 'w')
         i = 0
-
         phoneme_dict = {}
         speaker_utt_dict = {}
-
         for file_id in file_id_list:
             wav_file = os.path.join(self.wav_dir, file_id + '.wav')
             lab_file = os.path.join(self.lab_dir, file_id + '.lab')
@@ -174,29 +174,29 @@ class ForcedAlignment(object):
         """
         # write a CFG for extracting MFCCs
         open(self.cfg, 'w').write("""SOURCEKIND = WAVEFORM
-SOURCEFORMAT = WAVE
-TARGETRATE = 50000.0
-TARGETKIND = MFCC_D_A_0
-WINDOWSIZE = 250000.0
-PREEMCOEF = 0.97
-USEHAMMING = T
-ENORMALIZE = T
-CEPLIFTER = 22
-NUMCHANS = 20
-NUMCEPS = 12
-""")
+            SOURCEFORMAT = WAVE
+            TARGETRATE = 50000.0
+            TARGETKIND = MFCC_D_A_0
+            WINDOWSIZE = 250000.0
+            PREEMCOEF = 0.97
+            USEHAMMING = T
+            ENORMALIZE = T
+            CEPLIFTER = 22
+            NUMCHANS = 20
+            NUMCEPS = 12
+            """)
         check_call([HCopy, '-C', self.cfg, '-S', self.copy_scp])
         # write a CFG for what we just built
         open(self.cfg, 'w').write("""TARGETRATE = 50000.0
-TARGETKIND = USER
-WINDOWSIZE = 250000.0
-PREEMCOEF = 0.97
-USEHAMMING = T
-ENORMALIZE = T
-CEPLIFTER = 22
-NUMCHANS = 20
-NUMCEPS = 12
-""")
+            TARGETKIND = USER
+            WINDOWSIZE = 250000.0
+            PREEMCOEF = 0.97
+            USEHAMMING = T
+            ENORMALIZE = T
+            CEPLIFTER = 22
+            NUMCHANS = 20
+            NUMCEPS = 12
+            """)
 
     def _nxt_dir(self):
         """
@@ -250,9 +250,11 @@ NUMCEPS = 12
         print('---extracting features')
         self._HCopy()
         print(time.strftime("%c"))
-
         print('---feature_normalisation')
-        normaliser = MeanVarianceNorm(39)
+        io_funcs = HTKFeat_read()
+        htk_writer = HTKFeat_write(veclen=io_funcs.veclen, sampPeriod=io_funcs.sampPeriod, paramKind=9)
+        normaliser = Statis(feature_dimension=39, read_func=io_funcs.getall, writer_func=htk_writer.writeall)
+
         for key_name in list(speaker_utt_dict.keys()):
             normaliser.feature_normalisation(speaker_utt_dict[key_name], speaker_utt_dict[key_name])  ## save to itself
         print(time.strftime("%c"))

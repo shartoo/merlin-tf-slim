@@ -43,6 +43,8 @@ import logging
 import numpy
 from io_funcs.binary_io import BinaryIOCollection
 
+from util import file_util, math_statis
+
 
 class MinMaxNormalisation(object):
     def __init__(self, feature_dimension, min_value=0.01, max_value=0.99, min_vector=0.0, max_vector=0.0,
@@ -79,47 +81,6 @@ class MinMaxNormalisation(object):
 
         logger.debug('MinMaxNormalisation created for feature dimension of %d' % self.feature_dimension)
 
-    def load_min_max_values(self, label_norm_file):
-
-        logger = logging.getLogger("acoustic_norm")
-
-        io_funcs = BinaryIOCollection()
-        min_max_vector, frame_number = io_funcs.load_binary_file_frame(label_norm_file, 1)
-        min_max_vector = numpy.reshape(min_max_vector, (-1,))
-        self.min_vector = min_max_vector[0:frame_number // 2]
-        self.max_vector = min_max_vector[frame_number // 2:]
-
-        logger.info('Loaded min max values from the trained data for feature dimension of %d' % self.feature_dimension)
-
-    def find_min_max_values(self, in_file_list):
-
-        logger = logging.getLogger("acoustic_norm")
-
-        file_number = len(in_file_list)
-        min_value_matrix = numpy.zeros((file_number, self.feature_dimension))
-        max_value_matrix = numpy.zeros((file_number, self.feature_dimension))
-        io_funcs = BinaryIOCollection()
-        for i in range(file_number):
-            features = io_funcs.load_binary_file(in_file_list[i], self.feature_dimension)
-
-            temp_min = numpy.amin(features, axis=0)
-            temp_max = numpy.amax(features, axis=0)
-
-            min_value_matrix[i,] = temp_min;
-            max_value_matrix[i,] = temp_max;
-
-        self.min_vector = numpy.amin(min_value_matrix, axis=0)
-        self.max_vector = numpy.amax(max_value_matrix, axis=0)
-        self.min_vector = numpy.reshape(self.min_vector, (1, self.feature_dimension))
-        self.max_vector = numpy.reshape(self.max_vector, (1, self.feature_dimension))
-
-        # po=numpy.get_printoptions()
-        # numpy.set_printoptions(precision=2, threshold=20, linewidth=1000, edgeitems=4)
-        logger.info('across %d files found min/max values of length %d:' % (file_number, self.feature_dimension))
-        logger.info('  min: %s' % self.min_vector)
-        logger.info('  max: %s' % self.max_vector)
-        # restore the print options
-        # numpy.set_printoptions(po)
 
     def normalise_data(self, in_file_list, out_file_list):
         file_number = len(in_file_list)
@@ -211,21 +172,16 @@ class MinMaxNormalisation(object):
             io_funcs.array_to_binary_file(norm_features, out_file_list[i])
 
     def compute_mean(self, file_list):
-
         logger = logging.getLogger("acoustic_norm")
-
         mean_vector = numpy.zeros((1, self.feature_dimension))
         all_frame_number = 0
-
         io_funcs = BinaryIOCollection()
         for file_name in file_list:
             features = io_funcs.load_binary_file(file_name, self.feature_dimension)
             current_frame_number = features.size // self.feature_dimension
             mean_vector += numpy.reshape(numpy.sum(features, axis=0), (1, self.feature_dimension))
             all_frame_number += current_frame_number
-
         mean_vector /= float(all_frame_number)
-
         # po=numpy.get_printoptions()
         # numpy.set_printoptions(precision=2, threshold=20, linewidth=1000, edgeitems=4)
         logger.info('computed mean vector of length %d :' % mean_vector.shape[1])
@@ -271,8 +227,8 @@ if __name__ == '__main__':
     out_file_list1 = ['/group/project/dnn_tts/herald_001.test.sp']
 
     feature_dimension = 1025
-
-    normaliser = MinMaxNormalisation(feature_dimension, min_value=0.01, max_value=0.99)
+    normaliser = math_statis.Statis(feature_dimension=feature_dimension, read_func=file_util.load_binary_file_frame,
+                                    writer_func=file_util.array_to_binary_file)
     normaliser.find_min_max_values(in_file_list)
     tmp_min_vector = normaliser.min_vector
     tmp_max_vector = normaliser.max_vector

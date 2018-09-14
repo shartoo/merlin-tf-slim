@@ -60,9 +60,6 @@ from frontend.acoustic_composition import AcousticComposition
 # the new class for label composition and normalisation
 from frontend.label_composer import LabelComposer
 from frontend.label_normalisation import HTSLabelNormalisation, HTSDurationLabelNormalisation
-# from frontend.feature_normalisation_base import FeatureNormBase
-from frontend.mean_variance_norm import MeanVarianceNorm
-from frontend.min_max_norm import MinMaxNormalisation
 from frontend.parameter_generation import ParameterGeneration
 from frontend.silence_remover import SilenceRemover
 from frontend.silence_remover import trim_silence
@@ -74,6 +71,9 @@ from models.dnn import DNN
 from utils.compute_distortion import IndividualDistortionComp
 from utils.generate import generate_wav
 from utils.providers import ListDataProvider
+
+# from frontend.feature_normalisation_base import FeatureNormBase
+from util import file_util, math_statis
 
 
 # from models.ms_dnn import MultiStreamDNN
@@ -512,6 +512,8 @@ def main_function(cfg):
     label_norm_file = 'label_norm_%s.dat' % (cfg.label_style)
     label_norm_file = os.path.join(label_data_dir, label_norm_file)
 
+    normaliser = math_statis.Statis(feature_dimension=lab_dim, read_func=file_util.load_binary_file_frame,
+                                    writer_func=file_util.array_to_binary_file, min_value=0.01, max_value=0.99)
     if cfg.NORMLAB and (cfg.label_style in ['HTS', 'HTS_duration']):
         # simple HTS labels
         logger.info('preparing label data (input) using standard HTS style labels')
@@ -523,11 +525,9 @@ def main_function(cfg):
         elif cfg.label_style == 'HTS_duration':
             ## don't remove silences for duration
             nn_label_file_list = binary_label_file_list
-
-        min_max_normaliser = MinMaxNormalisation(feature_dimension=lab_dim, min_value=0.01, max_value=0.99)
         ###use only training data to find min-max information, then apply on the whole dataset
-        min_max_normaliser.find_min_max_values(nn_label_file_list[0:cfg.train_file_number])
-        min_max_normaliser.normalise_data(nn_label_file_list, nn_label_norm_file_list)
+        normaliser.find_min_max_values(nn_label_file_list[0:cfg.train_file_number])
+        normaliser.normalise_data(nn_label_file_list, nn_label_norm_file_list)
 
     if cfg.NORMLAB and (cfg.label_style == 'composed'):
         # new flexible label preprocessor
@@ -605,15 +605,14 @@ def main_function(cfg):
             # start from the labels we have just produced, not trimmed versions
             nn_label_file_list = binary_label_file_list
 
-        min_max_normaliser = MinMaxNormalisation(feature_dimension=lab_dim, min_value=0.01, max_value=0.99)
         ###use only training data to find min-max information, then apply on the whole dataset
-        min_max_normaliser.find_min_max_values(nn_label_file_list[0:cfg.train_file_number])
-        min_max_normaliser.normalise_data(nn_label_file_list, nn_label_norm_file_list)
+        normaliser.find_min_max_values(nn_label_file_list[0:cfg.train_file_number])
+        normaliser.normalise_data(nn_label_file_list, nn_label_norm_file_list)
 
-    if min_max_normaliser != None:
+    if normaliser != None:
         ### save label normalisation information for unseen testing labels
-        label_min_vector = min_max_normaliser.min_vector
-        label_max_vector = min_max_normaliser.max_vector
+        label_min_vector = normaliser.min_vector
+        label_max_vector = normaliser.max_vector
         label_norm_info = numpy.concatenate((label_min_vector, label_max_vector), axis=0)
 
         label_norm_info = numpy.array(label_norm_info, 'float32')
@@ -674,8 +673,10 @@ def main_function(cfg):
     if cfg.NORMCMP:
         logger.info('normalising acoustic (output) features using method %s' % cfg.output_feature_normalisation)
         cmp_norm_info = None
+        normaliser = math_statis.Statis(feature_dimension=cfg.cmp_dim, read_func=file_util.load_binary_file_frame,
+                                        writer_func=file_util.array_to_binary_file)
         if cfg.output_feature_normalisation == 'MVN':
-            normaliser = MeanVarianceNorm(feature_dimension=cfg.cmp_dim)
+
             ###calculate mean and std vectors on the training data, and apply on the whole dataset
             global_mean_vector = normaliser.compute_mean(nn_cmp_nosil_file_list[0:cfg.train_file_number], 0,
                                                          cfg.cmp_dim)
@@ -687,17 +688,18 @@ def main_function(cfg):
             cmp_norm_info = numpy.concatenate((global_mean_vector, global_std_vector), axis=0)
 
         elif cfg.output_feature_normalisation == 'MINMAX':
-            min_max_normaliser = MinMaxNormalisation(feature_dimension=cfg.cmp_dim)
-            global_mean_vector = min_max_normaliser.compute_mean(nn_cmp_nosil_file_list[0:cfg.train_file_number])
-            global_std_vector = min_max_normaliser.compute_std(nn_cmp_nosil_file_list[0:cfg.train_file_number],
+
+            global_mean_vector = normaliser.compute_mean(nn_cmp_nosil_file_list[0:cfg.train_file_number])
+            global_std_vector = normaliser.compute_std(nn_cmp_nosil_file_list[0:cfg.train_file_number],
                                                                global_mean_vector)
+            normaliser = math_statis.Statis(feature_dimension=cfg.cmp_dim, read_func=file_util.load_binary_file_frame,
+                                            writer_func=file_util.array_to_binary_file, min_value=0.01, max_value=0.99)
+            # min_max_normaliser = MinMaxNormalisation(feature_dimension=cfg.cmp_dim, min_value=0.01, max_value=0.99)
+            normaliser.find_min_max_values(nn_cmp_nosil_file_list[0:cfg.train_file_number])
+            normaliser.normalise_data(nn_cmp_nosil_file_list, nn_cmp_norm_file_list)
 
-            min_max_normaliser = MinMaxNormalisation(feature_dimension=cfg.cmp_dim, min_value=0.01, max_value=0.99)
-            min_max_normaliser.find_min_max_values(nn_cmp_nosil_file_list[0:cfg.train_file_number])
-            min_max_normaliser.normalise_data(nn_cmp_nosil_file_list, nn_cmp_norm_file_list)
-
-            cmp_min_vector = min_max_normaliser.min_vector
-            cmp_max_vector = min_max_normaliser.max_vector
+            cmp_min_vector = normaliser.min_vector
+            cmp_max_vector = normaliser.max_vector
             cmp_norm_info = numpy.concatenate((cmp_min_vector, cmp_max_vector), axis=0)
 
         else:
@@ -828,14 +830,16 @@ def main_function(cfg):
         cmp_min_max = cmp_min_max.reshape((2, -1))
         cmp_min_vector = cmp_min_max[0,]
         cmp_max_vector = cmp_min_max[1,]
-
-        if cfg.output_feature_normalisation == 'MVN':
-            denormaliser = MeanVarianceNorm(feature_dimension=cfg.cmp_dim)
+        denormaliser = math_statis.Statis(feature_dimension=cfg.cmp_dim, read_func=file_util.load_binary_file_frame,
+                                          writer_func=file_util.array_to_binary_file)
+        if cfg.output_feature_normalisation == 'MVN'
             denormaliser.feature_denormalisation(gen_file_list, gen_file_list, cmp_min_vector, cmp_max_vector)
 
         elif cfg.output_feature_normalisation == 'MINMAX':
-            denormaliser = MinMaxNormalisation(cfg.cmp_dim, min_value=0.01, max_value=0.99, min_vector=cmp_min_vector,
-                                               max_vector=cmp_max_vector)
+            denormaliser = math_statis.Statis(feature_dimension=cfg.cmp_dim, read_func=file_util.load_binary_file_frame,
+                                              writer_func=file_util.array_to_binary_file,
+                                              min_value=0.01, max_value=0.99, min_vector=cmp_min_vector,
+                                              max_vector=cmp_max_vector)
             denormaliser.denormalise_data(gen_file_list, gen_file_list)
         else:
             logger.critical('denormalising method %s is not supported!\n' % (cfg.output_feature_normalisation))

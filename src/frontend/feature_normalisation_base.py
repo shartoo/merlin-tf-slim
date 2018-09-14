@@ -69,49 +69,36 @@ class FeatureNormBase(object):
 
         #        self.dimension_dict = dimension_dict
         self.feature_dimension = feature_dimension
-
         mean_vector = self.compute_mean(in_file_list, 0, feature_dimension)
         std_vector = self.compute_std(in_file_list, mean_vector, 0, feature_dimension)
-
         io_funcs = BinaryIOCollection()
         file_number = len(in_file_list)
 
         for i in range(file_number):
             features, current_frame_number = io_funcs.load_binary_file_frame(in_file_list[i], self.feature_dimension)
-
             mean_matrix = numpy.tile(mean_vector, (current_frame_number, 1))
             std_matrix = numpy.tile(std_vector, (current_frame_number, 1))
-
             norm_features = (features - mean_matrix) / std_matrix
-
             io_funcs.array_to_binary_file(norm_features, out_file_list[i])
-
         return mean_vector, std_vector
 
     def find_min_max_values(self, in_file_list, start_index, end_index):
-
         local_feature_dimension = end_index - start_index
-
         file_number = len(in_file_list)
         min_value_matrix = numpy.zeros((file_number, local_feature_dimension))
         max_value_matrix = numpy.zeros((file_number, local_feature_dimension))
         io_funcs = BinaryIOCollection()
         for i in range(file_number):
             features = io_funcs.load_binary_file(in_file_list[i], self.feature_dimension)
-
             temp_min = numpy.amin(features[:, start_index:end_index], axis=0)
             temp_max = numpy.amax(features[:, start_index:end_index], axis=0)
 
             min_value_matrix[i,] = temp_min;
             max_value_matrix[i,] = temp_max;
-
         self.min_vector = numpy.amin(min_value_matrix, axis=0)
         self.max_vector = numpy.amax(max_value_matrix, axis=0)
         self.min_vector = numpy.reshape(self.min_vector, (1, local_feature_dimension))
         self.max_vector = numpy.reshape(self.max_vector, (1, local_feature_dimension))
-
-        # po=numpy.get_printoptions()
-        # numpy.set_printoptions(precision=2, threshold=20, linewidth=1000, edgeitems=4)
         self.logger.info('found min/max values of length %d:' % local_feature_dimension)
         self.logger.info('  min: %s' % self.min_vector)
         self.logger.info('  max: %s' % self.max_vector)
