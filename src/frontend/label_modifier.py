@@ -1,6 +1,3 @@
-import re, sys
-from io_funcs.binary_io import BinaryIOCollection
-
 import re
 import sys
 
@@ -69,20 +66,12 @@ class HTSLabelModification(object):
         logger = logging.getLogger("dur")
 
         state_number = self.state_number
-        dur_dim = state_number
-
-        io_funcs = BinaryIOCollection()
-        dur_features, frame_number = io_funcs.load_binary_file_frame(gen_dur_file_name, dur_dim)
-
-        fid = open(label_file_name)
-        utt_labels = fid.readlines()
-        fid.close()
-
+        utt_labels, dur_features, frame_number = self.load_utt_labels(label_file_name, gen_dur_file_name,
+                                                                      self.state_number)
         label_number = len(utt_labels)
         logger.info('loaded %s, %3d labels' % (label_file_name, label_number))
 
         out_fid = open(gen_lab_file_name, 'w')
-
         current_index = 0
         prev_end_time = 0
         for line in utt_labels:
@@ -133,19 +122,11 @@ class HTSLabelModification(object):
         logger.debug('modifed label with predicted duration of %d frames x %d features' % dur_features.shape)
 
     def modify_dur_from_phone_alignment_labels(self, label_file_name, gen_dur_file_name, gen_lab_file_name):
-        logger = logging.getLogger("dur")
 
         dur_dim = 1
-
-        io_funcs = BinaryIOCollection()
-        dur_features, frame_number = io_funcs.load_binary_file_frame(gen_dur_file_name, dur_dim)
-
-        fid = open(label_file_name)
-        utt_labels = fid.readlines()
-        fid.close()
-
+        utt_labels, dur_features, frame_number = self.load_utt_labels(label_file_name, gen_dur_file_name, dur_dim)
         label_number = len(utt_labels)
-        logger.info('loaded %s, %3d labels' % (label_file_name, label_number))
+        log.info('loaded %s, %3d labels' % (label_file_name, label_number))
 
         out_fid = open(gen_lab_file_name, 'w')
 
@@ -168,19 +149,27 @@ class HTSLabelModification(object):
                 full_label = temp_list[2]
 
             label_binary_flag = self.check_silence_pattern(full_label)
-
+            dur_time = 0
             if label_binary_flag == 1:
-                current_phone_dur = end_time - start_time
-                out_fid.write(
-                    str(prev_end_time) + ' ' + str(prev_end_time + current_phone_dur) + ' ' + full_label + '\n')
-                prev_end_time = prev_end_time + current_phone_dur
+                dur_time = end_time - start_time
+                out_fid.write(str(prev_end_time) + ' ' + str(prev_end_time + dur_time) + ' ' + full_label + '\n')
+                prev_end_time = prev_end_time + dur_time
                 continue;
             else:
                 phone_dur = dur_features[current_index]
-                phone_dur = int(phone_dur) * 5 * 10000
-                out_fid.write(str(prev_end_time) + ' ' + str(prev_end_time + phone_dur) + ' ' + full_label + '\n')
-                prev_end_time = prev_end_time + phone_dur
-
+                dur_time = int(phone_dur) * 5 * 10000
+            out_fid.write(str(prev_end_time) + ' ' + str(prev_end_time + dur_time) + ' ' + full_label + '\n')
+            prev_end_time = prev_end_time + dur_time
             current_index += 1
 
         logger.debug('modifed label with predicted duration of %d frames x %d features' % dur_features.shape)
+
+    def load_utt_labels(self, label_file_name, gen_dur_file_name, dur_dim):
+
+        io_funcs = BinaryIOCollection()
+        dur_features, frame_number = io_funcs.load_binary_file_frame(gen_dur_file_name, dur_dim)
+
+        fid = open(label_file_name)
+        utt_labels = fid.readlines()
+        fid.close()
+        return utt_labels, dur_features, frame_number

@@ -39,11 +39,11 @@
 
 
 import math
-import numpy
 import re
 import sys
 from multiprocessing.dummy import Pool as ThreadPool
 
+import numpy
 from io_funcs.binary_io import BinaryIOCollection
 
 
@@ -198,17 +198,6 @@ class SilenceRemover(object):
         fid.close()
 
         return nonsilence_frame_index_list
-
-
-# def load_binary_file(self, file_name, dimension):
-
-#        fid_lab = open(file_name, 'rb')
-#        features = numpy.fromfile(fid_lab, dtype=numpy.float32)
-#        fid_lab.close()
-#        features = features[:(dimension * (features.size / dimension))]
-#        features = features.reshape((-1, dimension))
-
-#        return  features
 
 
 def trim_silence(in_list, out_list, in_dimension, label_list, label_dimension, \

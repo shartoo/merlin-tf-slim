@@ -42,6 +42,7 @@ import os
 
 import numpy
 
+from util import acoustic_util
 from .acoustic_base import AcousticBase
 from .io_funcs.binary_io import BinaryIOCollection
 
@@ -49,28 +50,12 @@ from .io_funcs.binary_io import BinaryIOCollection
 # io_funcs.
 
 class AcousticComposition(AcousticBase):
-    ###prepare_nn_data(self, in_file_list_dict, out_file_list, in_dimension_dict, out_dimension_dict):
-
-    '''
-    variables inheritate from AcousticBase:
-        self.compute_dynamic = {}
-        self.file_number = 0
-        self.data_stream_number = 0
-        self.data_stream_list = []
-
-        self.out_dimension = 0
-        self.record_vuv    = False
-    '''
 
     def make_equal_frames(self, in_file_list, ref_file_list, in_dimension_dict):
         logger = logging.getLogger("acoustic_comp")
-
         logger.info('making equal number of lines...')
-
         io_funcs = BinaryIOCollection()
-
         utt_number = len(in_file_list)
-
         for i in range(utt_number):
             in_file_name = in_file_list[i]
             in_data_stream_name = in_file_name.split('.')[-1]
@@ -90,7 +75,6 @@ class AcousticComposition(AcousticBase):
             elif in_frame_number < ref_frame_number:
                 target_features[0:in_frame_number, ] = in_features[0:in_frame_number, ]
             io_funcs.array_to_binary_file(target_features, in_file_name)
-
         logger.info('Finished: made equal rows in data stream %s with reference to data stream %s ' % (
         in_data_stream_name, ref_data_stream_name))
 
@@ -143,15 +127,12 @@ class AcousticComposition(AcousticBase):
                     raise
 
                 dim_index = stream_start_index[data_stream_name]
-
                 if data_stream_name in ['lf0', 'F0']:  ## F0 added for GlottHMM
-                    features, vuv_vector = self.interpolate_f0(features)
-
+                    features, vuv_vector = acoustic_util.interpolate_f0(features)
                     ### if vuv information to be recorded, store it in corresponding column
                     if self.record_vuv:
                         out_data_matrix[0:out_frame_number,
                         stream_start_index['vuv']:stream_start_index['vuv'] + 1] = vuv_vector
-
                 out_data_matrix[0:out_frame_number, dim_index:dim_index + in_feature_dim] = features
                 dim_index = dim_index + in_feature_dim
 

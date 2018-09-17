@@ -128,7 +128,6 @@ def extract_feats_by_straight(straight, wav_file, sample_rate):
     alpha = fs_alpha_dict[sample_rate]
     mcsize = 59
     order = 24
-    nFFTHalf = 1 + nFFT / 2
     fshift = 5
     sox_wav_2_raw_cmd = 'sox %s -b 16 -c 1 -r %s -t raw %s' % (wav_file, \
                                                                sample_rate, \
@@ -136,43 +135,23 @@ def extract_feats_by_straight(straight, wav_file, sample_rate):
     os.system(sox_wav_2_raw_cmd)
     ### STRAIGHT ANALYSIS -- extract vocoder parameters ###
     ### extract f0, sp, ap ###
-    straight_f0_analysis_cmd = "%s -nmsg -maxf0 400 -uf0 400 -minf0 50 -lf0 50 -f0shift %s -f %s -raw %s %s" % (
-        os.path.join(straight, 'tempo'), \
-        fshift, sample_rate, \
-        os.path.join(raw_dir, file_id + '.raw'), \
-        os.path.join(f0_dir, file_id + '.f0'))
-    os.system(straight_f0_analysis_cmd)
-
-    straight_ap_analysis_cmd = "%s -nmsg -f %s -fftl %s -apord %s -shift %s -f0shift %s -float -f0file %s -raw %s %s" % (
-        os.path.join(straight, 'straight_bndap'), \
-        sample_rate, nFFT, nFFTHalf, fshift, fshift, \
-        os.path.join(f0_dir, file_id + '.f0'), \
-        os.path.join(raw_dir, file_id + '.raw'), \
-        os.path.join(ap_dir, file_id + '.ap'))
-    os.system(straight_ap_analysis_cmd)
-
-    straight_sp_analysis_cmd = "%s -nmsg -f %s -fftl %s -apord %s -shift %s -f0shift %s -order %s -f0file %s -pow -float -raw %s %s" % (
-        os.path.join(straight, 'straight_mcep'), \
-        sample_rate, nFFT, nFFTHalf, fshift, fshift, mcsize, \
-        os.path.join(f0_dir, file_id + '.f0'), \
-        os.path.join(raw_dir, file_id + '.raw'), \
-        os.path.join(sp_dir, file_id + '.sp'))
-
-    os.system(straight_sp_analysis_cmd)
-
-    ### convert f0 to lf0 ###
+    raw_file = os.path.join(raw_dir, file_id + '.raw')
     f0_file = os.path.join(f0_dir, file_id + '.f0')
+    ap_file = os.path.join(ap_dir, file_id + '.ap')
+    sp_file = os.path.join(sp_dir, file_id + '.sp')
+    bap_file = os.path.join(bap_dir, file_id + '.bap')
+    mgc_file = os.path.join(mgc_dir, file_id + '.mgc')
     lf0_file = os.path.join(lf0_dir, file_id + '.lf0')
-    system_cmd_util.sptk_f0_to_lf0(sptk, f0_file, lf0_file)
 
+    system_cmd_util.straight_f0_analysis(straight, fshift, sample_rate, raw_file, f0_file)
+    system_cmd_util.straight_ap_analysis(straight, sample_rate, nFFT, fshift, f0_file, raw_file, ap_file)
+    system_cmd_util.straight_sp_analysis(straight, sample_rate, nFFT, fshift, mcsize, f0_file, raw_file, sp_file)
+    ### convert f0 to lf0 ###
+    system_cmd_util.sptk_f0_to_lf0(sptk, f0_file, lf0_file)
     ### convert sp to mgc ###
-    file_in = os.path.join(sp_dir, file_id + '.sp')
-    file_out = os.path.join(mgc_dir, file_id + '.mgc')
-    system_cmd_util.sptk_mcep_cmd(sptk, 3, alpha, mcsize, nFFT, file_in, file_out)
+    system_cmd_util.sptk_mcep_cmd(sptk, 3, alpha, mcsize, nFFT, sp_file, mgc_file)
     ### convert ap to bap ###
-    file_in = os.path.join(ap_dir, file_id + '.ap')
-    file_out = os.path.join(bap_dir, file_id + '.bap')
-    system_cmd_util.sptk_mcep_cmd(sptk, 1, alpha, mcsize, nFFT, file_in, file_out)
+    system_cmd_util.sptk_mcep_cmd(sptk, 1, alpha, order, nFFT, ap_file, bap_file)
 
 def extract_feat_by_world(wav_file, sample_rate, b_use_reaper=True):
     ''''''
@@ -265,26 +244,20 @@ def synthesis_by_straight(lf0, mgc, bap, synth_dir, sample_rate):
     file_id = os.path.basename(lf0).split(".")[0]
     ### convert lf0 to f0 ###
     f0_file = os.path.join(synth_dir, file_id + ".f0")
-    lf0_f0_cmd = "sptk/sopr -magic -1.0E+10 -EXP -MAGIC 0.0 %s | %s +fa > %s" % \
-                 (os.path.join(sptk, "sopr"), lf0, os.path.join(sptk, "x2x"), f0_file)
-
-    os.system(lf0_f0_cmd)
+    system_cmd_util.sptk_lf0_to_f0(sptk, lf0, f0_file)
+    # lf0_f0_cmd = "sptk/sopr -magic -1.0E+10 -EXP -MAGIC 0.0 %s | %s +fa > %s" % \
+    #              (os.path.join(sptk, "sopr"), lf0, os.path.join(sptk, "x2x"), f0_file)
+    #
+    # os.system(lf0_f0_cmd)
     ### convert mgc to sp ###
     sp_file = os.path.join(synth_dir, file_id + ".sp")
-    mgc_to_sp = "%s -a %d -g 0 -m %d -l %d -o 2 %s > $resyn_dir/$file_id.sp" % \
-                (os.path.join(sptk, "mgc2sp"), alpha, mcsize, nFFT, mgc, sp_file)
-    os.system(mgc_to_sp)
+    system_cmd_util.straight_mgc2apsp(sptk, alpha, mcsize, nFFT, mgc, 2, sp_file)
     ### convert bap to ap ###
     ap_file = os.path.join(synth_dir, file_id + ".ap")
-    mgc_to_sp = "%s -a %d -g 0 -m %d -l %d -o 0 %s > $resyn_dir/$file_id.bap" % \
-                (os.path.join(sptk, "mgc2sp"), alpha, order, nFFT, bap, ap_file)
-    os.system(mgc_to_sp)
+    system_cmd_util.straight_mgc2apsp(sptk, alpha, order, nFFT, bap, 0, ap_file)
     ## synthesis
     wav_file = os.path.join(synth_dir, file_id + ".wav")
-    synthesis_cmd = "%s -f %d  -spec -fftl %d  -shift %d  -sigp 1.2 -cornf 4000 -float -apfile %s %s %s %s" \
-                    % (os.path.join(straight, "synthesis_fft"), sample_rate, nFFT, fshift, ap_file, f0_file, sp_file,
-                       wav_file)
-    os.system(synthesis_cmd)
+    system_cmd_util.straight_synth(straight, sample_rate, nFFT, fshift, ap_file, f0_file, sp_file, wav_file)
     log.info("synthesized speech in " + wav_file)
 
 
@@ -311,9 +284,7 @@ def synthesis_by_worldv2(lf0, mgc, synth_dir, sample_rate):
     wav_file = os.path.join(synth_dir, file_id + ".wav")
     system_cmd_util.sptk_mgc_to_apsp(sptk, alpha, mcsize, nFFT, mgc, sp)
     system_cmd_util.sptk_mgc_to_apsp(sptk, alpha, order, nFFT, sp, ap)
-    synth_cmd = "%s %d %d  %s %s %s %s " % \
-                (os.path.join(world, "synth"), nFFT, sample_rate, f0, sp, ap, wav_file)
-    os.system(synth_cmd)
+    system_cmd_util.world_synth(world, nFFT, sample_rate, f0, sp, ap, wav_file)
     log.info("synthesize speech in " + wav_file)
 
 
@@ -342,20 +313,16 @@ def synthesis_by_world(lf0, mgc, bap, synth_dir, sample_rate):
     if post_filtering:
         ### post-filtering mgc ###
         mgcp = os.path.join(synth_dir, file_id + ".mgc_p")
-        mcpf_cmd = "%s -m %d -b %f %s > %s" % (os.path.join(sptk, "mcpf"), mcsize, pf_coef, mgc, mgcp)
-        os.system(mcpf_cmd)
+        system_cmd_util.sptk_mcpf_post_filtering_mgc(sptk, mcsize, pf_coef, mgc, mgcp)
     ### convert mgc to sp ###
     sp_file = os.path.join(synth_dir, file_id + ".sp")
     system_cmd_util.sptk_mgc_to_apsp(sptk, alpha, mcsize, nFFTHalf, mgc, sp_file)
-    ### convert bapd to bap ###
+    ### convert bap to bapd ###
     bapd = os.path.join(synth_dir, file_id + ".bapd")
-    x2x_cmd2 = "%s +fd %s > %s" % (os.path.join(sptk, "x2x"), bap, bapd)
-    os.system(x2x_cmd2)
+    system_cmd_util.sptk_x2x_bap2bapd(sptk, bap, bapd)
     # Final synthesis using WORLD
     wav_file = os.path.join(synth_dir, file_id + ".wav")
-    synth_cmd = "%s %d %d  %s %s %s %s " % \
-                (os.path.join(world, "synth"), nFFTHalf, sample_rate, f0, sp_file, bapd, wav_file)
-    os.system(synth_cmd)
+    system_cmd_util.world_synth(world, nFFTHalf, sample_rate, f0, sp_file, bapd, wav_file)
 
 #########used for world vocoder #######
 
@@ -375,16 +342,13 @@ def reaper_f0_extract(in_wavfile, f0_file_ref, f0_file_out, frame_shift_ms=5.0):
     of frames between the REAPER f0 track and the acoustic parameters extracted by the vocoder.
     f0_file_ref: f0 extracted by the vocoder. It is used as a reference to fix the number of frames, as explained.
     '''
-
     # Run REAPER:
     log.debug("Running REAPER f0 extraction...")
-    cmd = "%s -a -s -x 400 -m 50 -u %1.4f -i %s -f %s" % (
-        os.path.join(reaper, 'reaper'), frame_shift_ms / 1000.0, in_wavfile, f0_file_out + "_reaper")
-    os.system(cmd)
-
+    out_reaper = f0_file_out + "_reaper"
+    system_cmd_util.reaper_extract_f0(reaper, frame_shift_ms / 1000.0, in_wavfile, out_reaper)
     # Protection - number of frames:
     v_f0_ref = file_util.read_binfile(f0_file_ref, dim=1)
-    v_f0 = read_reaper_f0_file(f0_file_out + "_reaper")
+    v_f0 = read_reaper_f0_file(out_reaper)
     frm_diff = v_f0.size - v_f0_ref.size
     if frm_diff < 0:
         v_f0 = np.r_[v_f0, np.zeros(-frm_diff) + v_f0[-1]]

@@ -1,9 +1,9 @@
 import logging
+import re
+import sys
 
 import matplotlib.mlab as mlab
 import numpy
-import re
-import sys
 from io_funcs.binary_io import BinaryIOCollection
 
 from .linguistic_base import LinguisticBase
@@ -73,45 +73,41 @@ class HTSLabelNormalisation(LabelNormalisation):
         self.ori_question_dict = {}
         self.dict_size = 0
         self.continuous_flag = continuous_flag
+        self.subphone_feats_feature_size_dict = {"full": 9,
+                                                 ## zhizheng's original 5 state features + 4 phoneme features
+                                                 "minimal_frame": 2,
+                                                 ## the minimal features necessary to go from a state-level to frame-level model
+                                                 "state_only": 1,  ## this is equivalent to a state-based system
+                                                 "none": 0,  ## the phoneme level features only
+                                                 "frame_only": 1,
+                                                 ## this is equivalent to a frame-based system without relying on state-features
+                                                 "uniform_state": 2,
+                                                 ## this is equivalent to a frame-based system with uniform state-features
+                                                 "minimal_phoneme": 3,
+                                                 ## this is equivalent to a frame-based system with minimal features
+                                                 "coarse_coding": 4}  ## this is equivalent to a frame-based positioning system reported in Heiga Zen's work
         try:
             #            self.question_dict, self.ori_question_dict = self.load_question_set(question_file_name)
             self.discrete_dict, self.continuous_dict = self.load_question_set_continous(question_file_name)
         except:
             logger.critical('error whilst loading HTS question set')
             raise
-
         ###self.dict_size = len(self.question_dict)
-
         self.dict_size = len(self.discrete_dict) + len(self.continuous_dict)
         self.add_frame_features = add_frame_features
         self.subphone_feats = subphone_feats
-
-        if self.subphone_feats == 'full':
-            self.frame_feature_size = 9  ## zhizheng's original 5 state features + 4 phoneme features
-        elif self.subphone_feats == 'minimal_frame':
-            self.frame_feature_size = 2  ## the minimal features necessary to go from a state-level to frame-level model
-        elif self.subphone_feats == 'state_only':
-            self.frame_feature_size = 1  ## this is equivalent to a state-based system
-        elif self.subphone_feats == 'none':
-            self.frame_feature_size = 0  ## the phoneme level features only
-        elif self.subphone_feats == 'frame_only':
-            self.frame_feature_size = 1  ## this is equivalent to a frame-based system without relying on state-features
-        elif self.subphone_feats == 'uniform_state':
-            self.frame_feature_size = 2  ## this is equivalent to a frame-based system with uniform state-features
-        elif self.subphone_feats == 'minimal_phoneme':
-            self.frame_feature_size = 3  ## this is equivalent to a frame-based system with minimal features
-        elif self.subphone_feats == 'coarse_coding':
-            self.frame_feature_size = 4  ## this is equivalent to a frame-based positioning system reported in Heiga Zen's work
-            self.cc_features = self.compute_coarse_coding_features(3)
+        if self.subphone_feats in self.subphone_feats_feature_size_dict.keys():
+            if self.subphone_feats == 'coarse_coding':
+                self.frame_feature_size = 4  ## this is equivalent to a frame-based positioning system reported in Heiga Zen's work
+                self.cc_features = self.compute_coarse_coding_features(3)
+            else:
+                self.frame_feature_size = self.subphone_feats_feature_size_dict[self.subphone_feats]
         else:
             sys.exit('Unknown value for subphone_feats: %s' % (subphone_feats))
-
         self.dimension = self.dict_size + self.frame_feature_size
-
         ### if user wants to define their own input, simply set the question set to empty.
         if self.dict_size == 0:
             self.dimension = 0
-
         logger.debug('HTS-derived input feature dimension is %d + %d = %d' % (
         self.dict_size, self.frame_feature_size, self.dimension))
 
@@ -125,17 +121,14 @@ class HTSLabelNormalisation(LabelNormalisation):
         if utt_number != len(output_file_list):
             print("the number of input and output files should be the same!\n");
             sys.exit(1)
-
         ### set default feature type to numerical, if not assigned ###
         if not feature_type:
             feature_type = "numerical"
-
         ### set default unit size to state, if not assigned ###
         if not unit_size:
             unit_size = "state"
         if label_type == "phone_align":
             unit_size = "phoneme"
-
         ### set default feat size to frame or phoneme, if not assigned ###
         if feature_type == "binary":
             if not feat_size:
@@ -268,7 +261,6 @@ class HTSLabelNormalisation(LabelNormalisation):
                         syllable_duration = 0
                     if word_end:
                         word_duration = 0
-
             ### writing into dur_feature_matrix ###
             if feat_size == "frame":
                 dur_feature_matrix[dur_feature_index:dur_feature_index + frame_number, ] = current_block_array
@@ -470,9 +462,7 @@ class HTSLabelNormalisation(LabelNormalisation):
 
     def load_labels_with_state_alignment(self, file_name):
         ## setting add_frame_features to False performs either state/phoneme level normalisation
-
         logger = logging.getLogger("labels")
-
         if self.add_frame_features:
             assert self.dimension == self.dict_size + self.frame_feature_size
         elif self.subphone_feats != 'none':
@@ -667,7 +657,7 @@ class HTSLabelNormalisation(LabelNormalisation):
                 for state_index in xrange(1, state_number + 1):
                     state_index_backward = (state_number - state_index) + 1
                     frame_number = int(dur_data[i][state_index - 1])
-                    for j in xrange(frame_number):
+                    for j in range(frame_number):
                         duration_feature_array[frame_index, 0] = float(j + 1) / float(
                             frame_number)  ## fraction through state (forwards)
                         duration_feature_array[frame_index, 1] = float(frame_number - j) / float(
@@ -725,79 +715,6 @@ class HTSLabelNormalisation(LabelNormalisation):
             cc_feat_matrix[i, 2] = self.cc_features[2, 100 + rel_indx]
 
         return cc_feat_matrix
-
-    ### this function is not used now
-    def extract_coarse_coding_features_absolute(self, phone_duration):
-        dur = int(phone_duration)
-
-        cc_feat_matrix = numpy.zeros((dur, 3))
-
-        npoints1 = (dur * 2) * 10 + 1
-        npoints2 = (dur - 1) * 10 + 1
-        npoints3 = (2 * dur - 1) * 10 + 1
-
-        x1 = numpy.linspace(-dur, dur, npoints1)
-        x2 = numpy.linspace(1, dur, npoints2)
-        x3 = numpy.linspace(1, 2 * dur - 1, npoints3)
-
-        mu1 = 0
-        mu2 = (1 + dur) / 2
-        mu3 = dur
-        variance = 1
-        sigma = variance * ((dur / 10) + 2)
-        sigma1 = sigma
-        sigma2 = sigma - 1
-        sigma3 = sigma
-
-        y1 = mlab.normpdf(x1, mu1, sigma1)
-        y2 = mlab.normpdf(x2, mu2, sigma2)
-        y3 = mlab.normpdf(x3, mu3, sigma3)
-
-        for i in range(dur):
-            cc_feat_matrix[i, 0] = y1[(dur + 1 + i) * 10]
-            cc_feat_matrix[i, 1] = y2[i * 10]
-            cc_feat_matrix[i, 2] = y3[i * 10]
-
-        for i in range(3):
-            cc_feat_matrix[:, i] = cc_feat_matrix[:, i] / max(cc_feat_matrix[:, i])
-
-        return cc_feat_matrix
-
-    ### this function is not used now
-    def pattern_matching(self, label):
-        # this function is where most time is spent during label preparation
-        #
-        # it might be possible to speed it up by using pre-compiled regular expressions?
-        # (not trying this now, since we may change to to XML tree format for input instead of HTS labels)
-        #
-        label_size = len(label)
-
-        lab_binary_vector = numpy.zeros((1, self.dict_size))
-
-        for i in range(self.dict_size):
-            current_question_list = self.question_dict[str(i)]
-            binary_flag = 0
-            for iq in range(len(current_question_list)):
-                current_question = current_question_list[iq]
-                current_size = len(current_question)
-                if current_question[0] == '*' and current_question[current_size - 1] == '*':
-                    temp_question = current_question[1:current_size - 1]
-                    for il in range(1, label_size - current_size + 2):
-                        if temp_question == label[il:il + current_size - 2]:
-                            binary_flag = 1
-                elif current_question[current_size - 1] != '*':
-                    temp_question = current_question[1:current_size]
-                    if temp_question == label[label_size - current_size + 1:label_size]:
-                        binary_flag = 1
-                elif current_question[0] != '*':
-                    temp_question = current_question[0:current_size - 1]
-                    if temp_question == label[0:current_size - 1]:
-                        binary_flag = 1
-                if binary_flag == 1:
-                    break
-            lab_binary_vector[0, i] = binary_flag
-
-        return lab_binary_vector
 
     def pattern_matching_binary(self, label):
 
@@ -955,15 +872,10 @@ class HTSDurationLabelNormalisation(HTSLabelNormalisation):
 
     def load_labels_with_state_alignment(self, file_name, add_frame_features=False):
         ## add_frame_features not used in HTSLabelNormalisation -- only in XML version
-
         logger = logging.getLogger("labels")
-
         assert self.dimension == self.dict_size
-
         label_feature_matrix = numpy.empty((100000, self.dimension))
-
         label_feature_index = 0
-
         lab_binary_vector = numpy.zeros((1, self.dict_size))
         fid = open(file_name)
         utt_labels = fid.readlines()
@@ -971,22 +883,16 @@ class HTSDurationLabelNormalisation(HTSLabelNormalisation):
         current_index = 0
         label_number = len(utt_labels)
         logger.info('loaded %s, %3d labels' % (file_name, label_number))
-
         ## remove empty lines
         utt_labels = [line for line in utt_labels if line != '']
-
         for (line_number, line) in enumerate(utt_labels):
             temp_list = re.split('\s+', line.strip())
             full_label = temp_list[-1]  ## take last entry -- ignore timings if present
-
             label_binary_vector = self.pattern_matching_binary(full_label)
-
             # if there is no CQS question, the label_continuous_vector will become to empty
             label_continuous_vector = self.pattern_matching_continous_position(full_label)
             label_vector = numpy.concatenate([label_binary_vector, label_continuous_vector], axis=1)
-
             label_feature_matrix[line_number, :] = label_vector[:]
-
         label_feature_matrix = label_feature_matrix[:line_number + 1, :]
         logger.debug('made label matrix of %d frames x %d labels' % label_feature_matrix.shape)
         return label_feature_matrix

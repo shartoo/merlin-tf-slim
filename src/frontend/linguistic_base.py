@@ -56,14 +56,12 @@ class LinguisticBase(object):
     ## the output_file_list contains the file paths of the normalised linguistic data
     ##
     def perform_normalisation(self, ori_file_list, output_file_list, label_type="state_align", dur_file_list=None):
-
         logger = logging.getLogger("perform_normalisation")
         logger.info('perform linguistic feature extraction')
         self.utterance_num = len(ori_file_list)
         if self.utterance_num != len(output_file_list):
             logger.error('the number of input and output linguistic files should be the same!\n')
             sys.exit(1)
-
         def _perform_normalisation(i):
             if not dur_file_list:
                 self.extract_linguistic_features(ori_file_list[i], output_file_list[i], label_type)

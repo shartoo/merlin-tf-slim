@@ -105,11 +105,9 @@ class LabelComposer(object):
             if 'xpath' in feature_specification:
                 # xpath and hts are mutually exclusive label styles
                 assert 'hts' not in feature_specification
-
                 # if there is a mapper, then we will use that to convert the features to numbers
                 # we need to look at the mapper to deduce the dimensionality of vectors that it will produce
                 if 'mapper' in feature_specification:
-
                     # get an arbitrary item as the reference and measure its dimensionality
                     try:
                         l = len(next(iter(feature_specification['mapper'].values())))
@@ -125,25 +123,19 @@ class LabelComposer(object):
                                 'Inconsistent dimensionality in mapper for feature %s' % feature_specification)
                     self.label_dimension = self.label_dimension + l
                     # print '   add %s    cum: %s'%( str(l), self.label_dimension)
-
-
                 else:
                     # without a mapper, features will be single numerical values
                     self.label_dimension = self.label_dimension + 1
                     # print '   add 1    cum: %s'%( self.label_dimension)
-
                 # we have seen at least one feature that will required xpath label files to be loaded
                 self.label_styles['xpath'] = True
-
             if 'hts' in feature_specification:
                 assert 'xpath' not in feature_specification
                 self.label_styles['hts'] = False  # will become True once implemented
                 # not yet implemented !
                 self.logger.warning('HTS features not implemented - ignoring them!')
-
         self.label_dimension += 1  ## for frame features -- TODO: decide how to handle this properly
         # print '   add 3   cum: %s'%(  self.label_dimension)
-
         return self.label_dimension
 
 

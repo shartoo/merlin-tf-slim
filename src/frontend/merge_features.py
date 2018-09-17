@@ -1,7 +1,7 @@
 import logging
+import sys
 
 import numpy
-import sys
 from io_funcs.binary_io import BinaryIOCollection
 
 
@@ -9,7 +9,6 @@ class MergeFeat(object):
     def __init__(self, lab_dim=481, feat_dim=1):
 
         self.logger = logging.getLogger("labels")
-
         self.lab_dim = lab_dim
         self.feat_dim = feat_dim
 

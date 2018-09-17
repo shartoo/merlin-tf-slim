@@ -165,22 +165,16 @@ class MLParameterGeneration(object):
         win_length = self.win_length
         D_matrix = numpy.zeros((frame_number + win_length * 2, frame_number + win_length * 2),
                                dtype=theano.config.floatX)
-
         for i in range(win_length):
             D_matrix[i, i] = 1.0
             D_matrix[frame_number + win_length + i, frame_number + win_length + i] = 1.0
-
         for i in range(frame_number):
             D_matrix[win_length + i, win_length + i] = 1.0 / D_value
-
         return D_matrix
 
     def prepare_U(self, frame_number, U_vector):
 
         win_length = self.win_length
-
         U_expanded = numpy.zeros((frame_number + win_length * 2, 1), dtype=theano.config.floatX)
-
         U_expanded[win_length:frame_number + win_length, :] = U_vector
-
         return U_expanded

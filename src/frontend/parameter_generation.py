@@ -43,10 +43,10 @@ FAST_MLPG = True
 # io_funcs.
 
 import logging
-import numpy
 import os
 import re
 
+import numpy
 from io_funcs.binary_io import BinaryIOCollection
 
 if FAST_MLPG:
@@ -113,46 +113,28 @@ class ParameterGeneration(object):
                                do_MLPG=True, cfg=None):
 
         logger = logging.getLogger('param_generation')
-
         logger.debug('acoustic_decomposition for %d files' % len(in_file_list))
-
         self.load_covariance(var_file_dict, out_dimension_dict)
-
         stream_start_index = {}
         dimension_index = 0
         recorded_vuv = False
         vuv_dimension = None
-
         for feature_name in list(out_dimension_dict.keys()):
-            #            if feature_name != 'vuv':
             stream_start_index[feature_name] = dimension_index
-            #            else:
-            #                vuv_dimension = dimension_index
-            #                recorded_vuv = True
-
             dimension_index += out_dimension_dict[feature_name]
 
         io_funcs = BinaryIOCollection()
-
         mlpg_algo = MLParameterGeneration()
-
         findex = 0
         flen = len(in_file_list)
         for file_name in in_file_list:
-
             findex = findex + 1
-
             dir_name = os.path.dirname(file_name)
             file_id = os.path.splitext(os.path.basename(file_name))[0]
-
             features, frame_number = io_funcs.load_binary_file_frame(file_name, dimension)
-
             logger.info('processing %4d of %4d: %s' % (findex, flen, file_name))
-
             for feature_name in self.gen_wav_features:
-
                 logger.debug(' feature: %s' % feature_name)
-
                 current_features = features[:, stream_start_index[feature_name]:stream_start_index[feature_name] +
                                                                                 out_dimension_dict[feature_name]]
                 if FAST_MLPG:
@@ -161,18 +143,11 @@ class ParameterGeneration(object):
                     var = numpy.transpose(numpy.tile(var, frame_number))
                 else:
                     var = self.var[feature_name]
-
-                #                print  var.shape[1]
                 if do_MLPG == False:
                     gen_features = current_features
                 else:
                     gen_features = mlpg_algo.generation(current_features, var, out_dimension_dict[feature_name] // 3)
-                #                else:
-                #                    self.logger.critical("the dimensions do not match for MLPG: %d vs %d" %(var.shape[1], out_dimension_dict[feature_name]))
-                #                    raise
-
                 logger.debug(' feature dimensions: %d by %d' % (gen_features.shape[0], gen_features.shape[1]))
-
                 if feature_name in ['lf0', 'F0']:
                     if 'vuv' in stream_start_index:
                         vuv_feature = features[:, stream_start_index['vuv']:stream_start_index['vuv'] + 1]
