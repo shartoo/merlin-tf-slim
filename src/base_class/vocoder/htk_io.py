@@ -136,22 +136,16 @@ class HTK_Parm_IO(object):
         '''
         '''
         try:
-
             file = open(filename, 'wb')
-
             file.write(struct.pack('>I', self.n_samples))
             file.write(struct.pack('>I', self.samp_period))
             file.write(struct.pack('>H', self.samp_size))
             file.write(struct.pack('>H', self.param_kind))
-
             if (sys.byteorder == 'little'):
                 self.data.byteswap(True)  # force big-endian byte ordering
-
             self.data.tofile(file)
-
         except IOError as e:
             raise Exception(e)
-
         return None
 
     def print_info(self):
@@ -175,17 +169,12 @@ def test_HTK_Parm_IO():
     # filename_src = "../data/GE001_1.feat"
     filename_src = "../data/tr1.mfc"
     filename_dst = "../data/tr1_dst.mfc"
-
     htk = HTK_Parm_IO()
-
     try:
         print('SOURCE FILE : ')
         htk.read_htk(filename_src)
         htk.print_info()
-        # print "t", htk.dupa, sys.byteorder
-
         htk.writeHTK(filename_dst)
-
         print('TARGET FILE : ')
         htk2 = HTK_Parm_IO()
         htk2.read_htk(filename_dst)

@@ -4,13 +4,13 @@ import sys
 
 import matplotlib.mlab as mlab
 import numpy
-from io_funcs.binary_io import BinaryIOCollection
 
+from util import file_util, log_util
 from .linguistic_base import LinguisticBase
 
-
-# from logplot.logging_plotting import LoggerPlotter #, MultipleTimeSeriesPlot, SingleWeightMatrixPlot
-
+# from logplot.logging_plotting import LoggerPlotter
+# #, MultipleTimeSeriesPlot, SingleWeightMatrixPlot
+logger = log_util.get_logger("label normalisation")
 class LabelNormalisation(LinguisticBase):
     # this class only knows how to deal with a single style of labels (XML or HTS)
     # (to deal with composite labels, use LabelComposer instead)
@@ -26,18 +26,12 @@ class LabelNormalisation(LinguisticBase):
             A = self.load_labels_with_state_alignment(in_file_name)
         else:
             logger.critical("we don't support %s labels as of now!!" % (label_type))
-
         if out_file_name:
-            io_funcs = BinaryIOCollection()
-            io_funcs.array_to_binary_file(A, out_file_name)
+            file_util.array_to_binary_file(A, out_file_name)
         else:
             return A
 
-
 # -----------------------------
-
-
-
 class HTSLabelNormalisation(LabelNormalisation):
     """This class is to convert HTS format labels into continous or binary values, and store as binary format with float32 precision.
 
@@ -155,10 +149,8 @@ class HTSLabelNormalisation(LabelNormalisation):
         else:
             logger.critical("we don't support %s labels as of now!!" % (label_type))
             sys.exit(1)
-
         if out_file_name:
-            io_funcs = BinaryIOCollection()
-            io_funcs.array_to_binary_file(A, out_file_name)
+            file_util.array_to_binary_file(A, out_file_name)
         else:
             return A
 
@@ -292,7 +284,7 @@ class HTSLabelNormalisation(LabelNormalisation):
             current_index += 1
 
         if feat_size == "MLU":
-            for seg_indx in xrange(len(MLU_dur)):
+            for seg_indx in range(len(MLU_dur)):
                 seg_len = len(MLU_dur[seg_indx])
                 current_block_array = numpy.reshape(numpy.array(MLU_dur[seg_indx]), (-1, 1))
                 dur_feature_matrix[dur_feature_index:dur_feature_index + seg_len, ] = current_block_array
@@ -366,21 +358,15 @@ class HTSLabelNormalisation(LabelNormalisation):
 
         # this is not currently used ??? -- it works now :D
         logger = logging.getLogger("labels")
-        # logger.critical('unused function ???')
-        # raise Exception
-
         if dur_file_name:
-            io_funcs = BinaryIOCollection()
             dur_dim = 1  ## hard coded for now
-            manual_dur_data = io_funcs.load_binary_file(dur_file_name, dur_dim)
-
+            manual_dur_data, _ = file_util.load_binary_file(dur_file_name, dur_dim)
         if self.add_frame_features:
             assert self.dimension == self.dict_size + self.frame_feature_size
         elif self.subphone_feats != 'none':
             assert self.dimension == self.dict_size + self.frame_feature_size
         else:
             assert self.dimension == self.dict_size
-
         label_feature_matrix = numpy.empty((100000, self.dimension))
 
         ph_count = 0
@@ -469,14 +455,10 @@ class HTSLabelNormalisation(LabelNormalisation):
             assert self.dimension == self.dict_size + self.frame_feature_size
         else:
             assert self.dimension == self.dict_size
-
         # label_feature_matrix = numpy.empty((100000, self.dict_size+self.frame_feature_size))
         label_feature_matrix = numpy.empty((100000, self.dimension))
-
         label_feature_index = 0
-
         state_number = 5
-
         lab_binary_vector = numpy.zeros((1, self.dict_size))
         fid = open(file_name)
         utt_labels = fid.readlines()
@@ -489,11 +471,9 @@ class HTSLabelNormalisation(LabelNormalisation):
         state_duration_base = 0
         for line in utt_labels:
             line = line.strip()
-
             if len(line) < 1:
                 continue
             temp_list = re.split('\s+', line)
-
             if len(temp_list) == 1:
                 frame_number = 0
                 state_index = 1
@@ -515,14 +495,11 @@ class HTSLabelNormalisation(LabelNormalisation):
                 current_frame_number = 0
                 phone_duration = frame_number
                 state_duration_base = 0
-
                 #                label_binary_vector = self.pattern_matching(full_label)
                 label_binary_vector = self.pattern_matching_binary(full_label)
-
                 # if there is no CQS question, the label_continuous_vector will become to empty
                 label_continuous_vector = self.pattern_matching_continous_position(full_label)
                 label_vector = numpy.concatenate([label_binary_vector, label_continuous_vector], axis=1)
-
                 if len(temp_list) == 1:
                     state_index = state_number
                 else:
@@ -628,9 +605,8 @@ class HTSLabelNormalisation(LabelNormalisation):
     def extract_durational_features(self, dur_file_name=None, dur_data=None):
 
         if dur_file_name:
-            io_funcs = BinaryIOCollection()
             dur_dim = 1  ## hard coded for now
-            dur_data = io_funcs.load_binary_file(dur_file_name, dur_dim)
+            dur_data, _ = file_util.load_binary_file_frame(dur_file_name, dur_dim)
 
         ph_count = len(dur_data)
         total_num_of_frames = int(sum(dur_data))
@@ -654,7 +630,7 @@ class HTSLabelNormalisation(LabelNormalisation):
                 state_number = 5  # hard coded here
                 phone_duration = sum(dur_data[i, :])
                 state_duration_base = 0
-                for state_index in xrange(1, state_number + 1):
+                for state_index in range(1, state_number + 1):
                     state_index_backward = (state_number - state_index) + 1
                     frame_number = int(dur_data[i][state_index - 1])
                     for j in range(frame_number):

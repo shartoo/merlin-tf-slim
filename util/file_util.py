@@ -106,6 +106,15 @@ def del_path_list(path_list):
             log.debug(" file path %s was deleted" % path)
 
 
+def prepare_file_path_list(file_id_list, file_dir, file_extension, new_dir_switch=True):
+    if not os.path.exists(file_dir) and new_dir_switch:
+        os.makedirs(file_dir)
+    file_name_list = []
+    for file_id in file_id_list:
+        file_name = file_dir + '/' + file_id + file_extension
+        file_name_list.append(file_name)
+    return file_name_list
+
 def create_path_list(path_list):
     '''
     create file path in list

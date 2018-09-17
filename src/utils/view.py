@@ -42,7 +42,7 @@
 import sys
 
 # import numpy
-from io_funcs.binary_io import BinaryIOCollection
+from util import file_util
 
 if __name__ == '__main__':
 
@@ -50,15 +50,11 @@ if __name__ == '__main__':
     if len(sys.argv) < 3:
         print('usage: python view.py dimension filename(s)')
         sys.exit(1)
-
     dimension = int(sys.argv[1])
     fnames = sys.argv[2:]
-
     print(fnames)
-
-    io_funcs = BinaryIOCollection()
     for f in fnames:
-        features = io_funcs.load_binary_file(f, dimension)
+        features, _ = file_util.load_binary_file(f, dimension)
 
     print(features.shape)
     # print features

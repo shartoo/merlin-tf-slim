@@ -122,19 +122,9 @@ class HTKFeat_read(object):
         '''
         self.open_file(filename)
         self.readheader()
-
-        #        print   self.nSamples, self.veclen
-
-        #        print   self.parmKind, self.sampPeriod
-
         self.seek(0)
         data = numpy.fromfile(self.fh, self.dtype)
-        #        print   len(data), data.shape
-        #        if self.parmKind & _K: # Remove and ignore checksum
-        #            data = data[:-1]
-        #        print   data.shape
         data = data.reshape((-1, self.veclen))
-        #        data = tmp_data.reshape((len(tmp_data)/self.veclen, self.veclen))
         if self.swap:
             data = data.byteswap()
         # Uncompress data to floats if required

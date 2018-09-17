@@ -44,7 +44,8 @@ import sys
 from multiprocessing.dummy import Pool as ThreadPool
 
 import numpy
-from io_funcs.binary_io import BinaryIOCollection
+
+from util import file_util
 
 
 class SilenceRemover(object):
@@ -67,9 +68,6 @@ class SilenceRemover(object):
         if file_number != len(out_data_list):
             print("The number of input and output files does not equal!\n")
             sys.exit(1)
-
-        io_funcs = BinaryIOCollection()
-
         def _remove_silence(i):
             if self.label_type == "phone_align":
                 if dur_file_list:
@@ -79,8 +77,7 @@ class SilenceRemover(object):
                 nonsilence_indices = self.load_phone_alignment(in_align_list[i], dur_file_name)
             else:
                 nonsilence_indices = self.load_alignment(in_align_list[i])
-
-            ori_cmp_data = io_funcs.load_binary_file(in_data_list[i], self.n_cmp)
+            ori_cmp_data, _ = file_util.load_binary_file(in_data_list[i], self.n_cmp)
 
             frame_number = ori_cmp_data.size / self.n_cmp
 
@@ -111,9 +108,8 @@ class SilenceRemover(object):
     def load_phone_alignment(self, alignment_file_name, dur_file_name=None):
 
         if dur_file_name:
-            io_funcs = BinaryIOCollection()
             dur_dim = 1  ## hard coded for now
-            manual_dur_data = io_funcs.load_binary_file(dur_file_name, dur_dim)
+            manual_dur_data, _ = file_util.load_binary_file(dur_file_name, dur_dim)
 
         ph_count = 0
         base_frame_index = 0
@@ -212,11 +208,10 @@ def trim_silence(in_list, out_list, in_dimension, label_list, label_dimension, \
         silence_feature_index: index of feature in labels which is silence: 1 means silence (trim), 0 means leave.
     '''
     assert len(in_list) == len(out_list) == len(label_list)
-    io_funcs = BinaryIOCollection()
     for (infile, outfile, label_file) in zip(in_list, out_list, label_list):
 
-        data = io_funcs.load_binary_file(infile, in_dimension)
-        label = io_funcs.load_binary_file(label_file, label_dimension)
+        data, _ = file_util.load_binary_file(infile, in_dimension)
+        label, _ = file_util.load_binary_file(label_file, label_dimension)
 
         audio_label_difference = data.shape[0] - label.shape[0]
         assert math.fabs(audio_label_difference) < 3, '%s and %s contain different numbers of frames: %s %s' % (
