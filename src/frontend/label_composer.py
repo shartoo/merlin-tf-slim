@@ -80,9 +80,7 @@ class LabelComposer(object):
         except:
             self.logger.critical('error loading label configuration from %s' % filename)
             raise
-
         # perform some sanity checks on it
-        #
         # make sure 'labels' is defined
         try:
             assert self.configuration.labels
@@ -92,13 +90,11 @@ class LabelComposer(object):
     def compute_label_dimension(self):
 
         self.label_dimension = 0
-
         try:
             assert self.configuration
         except AssertionError:
             self.logger.critical('no label configuration loaded, so cannot compute dimension')
             raise
-
         for feature_specification in self.configuration.labels:
             # osw# self.logger.debug('looking at feature %s' % feature_specification )
             # feature is a dictionary specifying how to construct this part of the input feature vector

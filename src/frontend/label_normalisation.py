@@ -5,8 +5,9 @@ import sys
 import matplotlib.mlab as mlab
 import numpy
 
+from src.frontend.linguistic_base import LinguisticBase
+from src.frontend.question_util import load_question_set_continous
 from util import file_util, log_util
-from .linguistic_base import LinguisticBase
 
 # from logplot.logging_plotting import LoggerPlotter
 # #, MultipleTimeSeriesPlot, SingleWeightMatrixPlot
@@ -82,7 +83,7 @@ class HTSLabelNormalisation(LabelNormalisation):
                                                  "coarse_coding": 4}  ## this is equivalent to a frame-based positioning system reported in Heiga Zen's work
         try:
             #            self.question_dict, self.ori_question_dict = self.load_question_set(question_file_name)
-            self.discrete_dict, self.continuous_dict = self.load_question_set_continous(question_file_name)
+            self.discrete_dict, self.continuous_dict = load_question_set_continous(question_file_name)
         except:
             logger.critical('error whilst loading HTS question set')
             raise
@@ -386,7 +387,6 @@ class HTSLabelNormalisation(LabelNormalisation):
                 start_time = int(temp_list[0])
                 end_time = int(temp_list[1])
                 full_label = temp_list[2]
-
                 # to do - support different frame shift - currently hardwired to 5msec
                 # currently under beta testing: support different frame shift
                 if dur_file_name:
@@ -400,16 +400,13 @@ class HTSLabelNormalisation(LabelNormalisation):
             ph_count = ph_count + 1
             # label_binary_vector = self.pattern_matching(full_label)
             label_binary_vector = self.pattern_matching_binary(full_label)
-
             # if there is no CQS question, the label_continuous_vector will become to empty
             label_continuous_vector = self.pattern_matching_continous_position(full_label)
             label_vector = numpy.concatenate([label_binary_vector, label_continuous_vector], axis=1)
-
             if self.add_frame_features:
                 current_block_binary_array = numpy.zeros((frame_number, self.dict_size + self.frame_feature_size))
                 for i in range(frame_number):
                     current_block_binary_array[i, 0:self.dict_size] = label_vector
-
                     if self.subphone_feats == 'minimal_phoneme':
                         ## features which distinguish frame position in phoneme
                         current_block_binary_array[i, self.dict_size] = float(i + 1) / float(
@@ -659,20 +656,15 @@ class HTSLabelNormalisation(LabelNormalisation):
 
     def compute_coarse_coding_features(self, num_states):
         assert num_states == 3
-
         npoints = 600
         cc_features = numpy.zeros((num_states, npoints))
-
         x1 = numpy.linspace(-1.5, 1.5, npoints)
         x2 = numpy.linspace(-1.0, 2.0, npoints)
         x3 = numpy.linspace(-0.5, 2.5, npoints)
-
         mu1 = 0.0
         mu2 = 0.5
         mu3 = 1.0
-
         sigma = 0.4
-
         cc_features[0, :] = mlab.normpdf(x1, mu1, sigma)
         cc_features[1, :] = mlab.normpdf(x2, mu2, sigma)
         cc_features[2, :] = mlab.normpdf(x3, mu3, sigma)
@@ -712,124 +704,18 @@ class HTSLabelNormalisation(LabelNormalisation):
         return lab_binary_vector
 
     def pattern_matching_continous_position(self, label):
-
         dict_size = len(self.continuous_dict)
-
         lab_continuous_vector = numpy.zeros((1, dict_size))
-
         for i in range(dict_size):
             continuous_value = -1.0
-
             current_compiled = self.continuous_dict[str(i)]
-
             ms = current_compiled.search(label)
             if ms is not None:
-                #                assert len(ms.group()) == 1
                 continuous_value = ms.group(1)
-
             lab_continuous_vector[0, i] = continuous_value
 
         return lab_continuous_vector
 
-    def load_question_set(self, qs_file_name):
-        fid = open(qs_file_name)
-        question_index = 0
-        question_dict = {}
-        ori_question_dict = {}
-        for line in fid.readlines():
-            line = line.replace('\n', '')
-            if len(line) > 5:
-                temp_list = line.split('{')
-                temp_line = temp_list[1]
-                temp_list = temp_line.split('}')
-                temp_line = temp_list[0]
-                question_list = temp_line.split(',')
-                question_dict[str(question_index)] = question_list
-                ori_question_dict[str(question_index)] = line
-                question_index += 1
-        fid.close()
-
-        logger = logging.getLogger("labels")
-        logger.debug('loaded question set with %d questions' % len(question_dict))
-
-        return question_dict, ori_question_dict
-
-    def load_question_set_continous(self, qs_file_name):
-
-        logger = logging.getLogger("labels")
-
-        fid = open(qs_file_name)
-        binary_qs_index = 0
-        continuous_qs_index = 0
-        binary_dict = {}
-        continuous_dict = {}
-        LL = re.compile(re.escape('LL-'))
-
-        for line in fid.readlines():
-            line = line.replace('\n', '').replace('\t', ' ')
-
-            if len(line) > 5:
-                temp_list = line.split('{')
-                temp_line = temp_list[1]
-                temp_list = temp_line.split('}')
-                temp_line = temp_list[0]
-                temp_line = temp_line.strip()
-                question_list = temp_line.split(',')
-
-                temp_list = line.split(' ')
-                question_key = temp_list[1]
-                #                print   line
-                if temp_list[0] == 'CQS':
-                    assert len(question_list) == 1
-                    processed_question = self.wildcards2regex(question_list[0], convert_number_pattern=True)
-                    continuous_dict[str(continuous_qs_index)] = re.compile(
-                        processed_question)  # save pre-compiled regular expression
-                    continuous_qs_index = continuous_qs_index + 1
-                elif temp_list[0] == 'QS':
-                    re_list = []
-                    for temp_question in question_list:
-                        processed_question = self.wildcards2regex(temp_question)
-                        if LL.search(question_key):
-                            processed_question = '^' + processed_question
-                        re_list.append(re.compile(processed_question))
-
-                    binary_dict[str(binary_qs_index)] = re_list
-                    binary_qs_index = binary_qs_index + 1
-                else:
-                    logger.critical('The question set is not defined correctly: %s' % (line))
-                    raise Exception
-
-                #                question_index = question_index + 1
-        return binary_dict, continuous_dict
-
-    def wildcards2regex(self, question, convert_number_pattern=False):
-        """
-        Convert HTK-style question into regular expression for searching labels.
-        If convert_number_pattern, keep the following sequences unescaped for
-        extracting continuous values):
-            (\d+)       -- handles digit without decimal point
-            ([\d\.]+)   -- handles digits with and without decimal point
-        """
-
-        ## handle HTK wildcards (and lack of them) at ends of label:
-        prefix = ""
-        postfix = ""
-        if '*' in question:
-            if not question.startswith('*'):
-                prefix = "\A"
-            if not question.endswith('*'):
-                postfix = "\Z"
-        question = question.strip('*')
-        question = re.escape(question)
-        ## convert remaining HTK wildcards * and ? to equivalent regex:
-        question = question.replace('\\*', '.*')
-        question = question.replace('\\?', '.')
-        question = prefix + question + postfix
-
-        if convert_number_pattern:
-            question = question.replace('\\(\\\\d\\+\\)', '(\d+)')
-            question = question.replace('\\(\\[\\\\d\\\\\\.\\]\\+\\)', '([\d\.]+)')
-        return question
 
 
 class HTSDurationLabelNormalisation(HTSLabelNormalisation):
@@ -876,12 +762,9 @@ class HTSDurationLabelNormalisation(HTSLabelNormalisation):
 
 # -----------------------------
 
-
 if __name__ == '__main__':
-    qs_file_name = '/afs/inf.ed.ac.uk/group/cstr/projects/blizzard_entries/blizzard2016/straight_voice/Hybrid_duration_experiments/dnn_tts_release/lstm_rnn/data/questions.hed'
-
+    qs_file_name = "I:/newwork/merlin-tf-slim/data/questions/questions-unilex_dnn_600.hed"
     print(qs_file_name)
-
     ori_file_list = [
         '/afs/inf.ed.ac.uk/group/cstr/projects/blizzard_entries/blizzard2016/straight_voice/Hybrid_duration_experiments/dnn_tts_release/lstm_rnn/data/label_state_align/AMidsummerNightsDream_000_000.lab']
     output_file_list = [
