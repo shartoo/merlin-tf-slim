@@ -59,15 +59,11 @@ class TensorflowClass(object):
 
         inp_file_ext = cfg.inp_file_ext
         out_file_ext = cfg.out_file_ext
-
         ### Input-Output ###
-
         self.inp_dim = cfg.inp_dim
         self.out_dim = cfg.out_dim
-
         self.inp_norm = cfg.inp_norm
         self.out_norm = cfg.out_norm
-
         self.inp_stats_file = cfg.inp_stats_file
         self.out_stats_file = cfg.out_stats_file
 
@@ -108,18 +104,14 @@ class TensorflowClass(object):
         test_id_scp = cfg.test_id_scp
 
         #### main processess ####
-
         self.NORMDATA = cfg.NORMDATA
         self.TRAINMODEL = cfg.TRAINMODEL
         self.TESTMODEL = cfg.TESTMODEL
-
         #### Generate only test list ####
         self.GenTestList = cfg.GenTestList
-
         ###################################################
         ####### End of user-defined conf variables ########
         ###################################################
-
         #### Create train, valid and test file lists ####
         file_id_list = data_utils.read_file_list(file_id_scp)
 
@@ -182,7 +174,6 @@ class TensorflowClass(object):
     def train_tensorflow_model(self):
         print('preparing train_x, train_y from input and output feature files...')
         #### load the data ####
-
         train_x, train_y, train_flen = data_utils.read_data_from_file_list(self.inp_train_file_list,
                                                                            self.out_train_file_list,
                                                                            self.inp_dim, self.out_dim,

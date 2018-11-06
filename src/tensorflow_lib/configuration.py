@@ -37,10 +37,9 @@
 #  THIS SOFTWARE.
 ################################################################################
 
+import configparser
 import logging
 import os
-
-import ConfigParser
 
 
 class configuration(object):
@@ -62,10 +61,8 @@ class configuration(object):
         logger.addHandler(ch)
         formatter = logging.Formatter('%(asctime)s %(levelname)8s%(name)15s: %(message)s')
         ch.setFormatter(formatter)
-
         # first, set up some default configuration values
         self.initial_configuration()
-
         # next, load in any user-supplied configuration values
         # that might over-ride the default values
         self.user_configuration(configFile)
@@ -76,29 +73,22 @@ class configuration(object):
         logger.debug('configuration completed')
 
     def initial_configuration(self):
-
-        # to be called before loading any user specific values
-
+        # to be called before loading any user specific value
         # things to put here are
         # 1. variables that the user cannot change
         # 2. variables that need to be set before loading the user's config file
-
         UTTID_REGEX = '(.*)\..*'
-
     def user_configuration(self, configFile=None):
-
         # get a logger
         logger = logging.getLogger("configuration")
-
         # load and parse the provided configFile, if provided
         if not configFile:
             logger.warn('no user configuration file provided; using only built-in default settings')
             return
-
         # load the config file
         try:
-            configparser = ConfigParser.ConfigParser()
-            configparser.readfp(open(configFile))
+            cp = configparser.ConfigParser()
+            cp.readfp(open(configFile))
             logger.debug('successfully read and parsed user configuration file %s' % configFile)
         except:
             logger.fatal('error reading user configuration file %s' % configFile)
@@ -106,12 +96,10 @@ class configuration(object):
 
         # work_dir must be provided before initialising other directories
         self.work_dir = None
-
         if self.work_dir == None:
             try:
                 self.work_dir = configparser.get('Paths', 'work')
-
-            except (ConfigParser.NoSectionError, ConfigParser.NoOptionError):
+            except (configparser.NoSectionError, configparser.NoOptionError):
                 if self.work_dir == None:
                     logger.critical('Paths:work has no value!')
                     raise Exception
@@ -193,20 +181,18 @@ class configuration(object):
             ('NORMDATA', False, 'Processes', 'NORMDATA'),
             ('TRAINMODEL', False, 'Processes', 'TRAINMODEL'),
             ('TESTMODEL', False, 'Processes', 'TESTMODEL')
-
         ]
 
         # this uses exec(...) which is potentially dangerous since arbitrary code could be executed
         for (variable, default, section, option) in user_options:
             # default value
             value = None
-
             try:
                 # first, look for a user-set value for this variable in the config file
                 value = configparser.get(section, option)
                 user_or_default = 'user'
 
-            except (ConfigParser.NoSectionError, ConfigParser.NoOptionError):
+            except (configparser.NoSectionError, configparser.NoOptionError):
                 # use default value, if there is one
                 if (default == None) or \
                         (default == '') or \
