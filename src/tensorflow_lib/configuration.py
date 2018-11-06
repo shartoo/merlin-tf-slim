@@ -132,7 +132,6 @@ class configuration(object):
         impossible_float = float(-99999.0)
 
         user_options = [
-
             # Paths
             ('work_dir', self.work_dir, 'Paths', 'work'),
             ('data_dir', self.data_dir, 'Paths', 'data'),

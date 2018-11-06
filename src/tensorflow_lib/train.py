@@ -61,8 +61,7 @@ class TrainTensorflowModels(TensorflowModels):
     def train_feedforward_model(self, train_x, train_y, batch_size=256, num_of_epochs=10, shuffle_data=True):
         seed = 12345
         np.random.seed(seed)
-        print
-        train_x.shape
+        print(train_x.shape)
         with self.graph.as_default() as g:
             output_data = tf.placeholder(dtype=tf.float32, shape=(None, self.n_out), name="output_data")
             input_layer = g.get_collection(name="input_layer")[0]
@@ -79,7 +78,7 @@ class TrainTensorflowModels(TensorflowModels):
             with tf.Session() as sess:
                 init.run();
                 summary_writer = tf.summary.FileWriter(os.path.join(self.ckpt_dir, "losslog"), sess.graph)
-                for epoch in xrange(num_of_epochs):
+                for epoch in range(num_of_epochs):
                     L = 1;
                     overall_loss = 0
                     for iteration in range(int(train_x.shape[0] / batch_size) + 1):
@@ -159,7 +158,7 @@ class TrainTensorflowModels(TensorflowModels):
             with tf.Session() as sess:
                 init.run();
                 summary_writer = tf.summary.FileWriter(os.path.join(self.ckpt_dir, "losslog"), sess.graph)
-                for epoch in xrange(num_of_epochs):
+                for epoch in range(num_of_epochs):
                     L = 1;
                     overall_loss = 0
                     for iteration in range(int(len(train_x.keys()) / batch_size) + 1):
@@ -233,7 +232,7 @@ class TrainTensorflowModels(TensorflowModels):
             new_saver.restore(sess, os.path.join(self.ckpt_dir, "mymodel.ckpt"))
             print
             "The model parameters are successfully restored"
-            for utt_index in xrange(test_file_number):
+            for utt_index in range(test_file_number):
                 gen_test_file_name = gen_test_file_list[utt_index]
                 temp_test_x = test_x[test_id_list[utt_index]]
                 num_of_rows = temp_test_x.shape[0]

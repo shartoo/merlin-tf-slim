@@ -58,26 +58,25 @@ import numpy
 import numpy.distutils.__config__
 # and only after that can we import theano
 import theano
-from frontend.acoustic_composition import AcousticComposition
-# the new class for label composition and normalisation
-from frontend.label_composer import LabelComposer
-from frontend.label_modifier import HTSLabelModification
-from frontend.label_normalisation import HTSLabelNormalisation
-from frontend.merge_features import MergeFeat
-from frontend.parameter_generation import ParameterGeneration
-from frontend.silence_remover import SilenceRemover
-from frontend.silence_remover import trim_silence
-from io_funcs.binary_io import BinaryIOCollection
-# our custom logging class that can also plot
-from logplot.logging_plotting import LoggerPlotter, MultipleSeriesPlot, SingleWeightMatrixPlot
-from models.deep_rnn import DeepRecurrentNetwork
-from utils.acous_feat_extraction import acous_feat_extraction
-from utils.compute_distortion import IndividualDistortionComp
-from utils.file_paths import FilePaths
-from utils.generate import generate_wav
-from utils.providers import ListDataProvider
-from utils.utils import read_file_list, prepare_file_path_list
 
+from src.frontend.acoustic_composition import AcousticComposition
+# the new class for label composition and normalisation
+from src.frontend.label_composer import LabelComposer
+from src.frontend.label_modifier import HTSLabelModification
+from src.frontend.label_normalisation import HTSLabelNormalisation
+from src.frontend.merge_features import MergeFeat
+from src.frontend.parameter_generation import ParameterGeneration
+from src.frontend.silence_remover import SilenceRemover
+from src.frontend.silence_util import trim_silence
+# our custom logging class that can also plot
+from src.logplot.logging_plotting import LoggerPlotter, MultipleSeriesPlot, SingleWeightMatrixPlot
+from src.models.deep_rnn import DeepRecurrentNetwork
+from src.utils.acous_feat_extraction import acous_feat_extraction
+from src.utils.compute_distortion import IndividualDistortionComp
+from src.utils.file_paths import FilePaths
+from src.utils.generate import generate_wav
+from src.utils.providers import ListDataProvider
+from src.utils.utils import read_file_list, prepare_file_path_list
 from util import file_util, math_statis
 
 
@@ -136,13 +135,11 @@ def train_DNN(train_xy_file_list, valid_xy_file_list, \
         plotlogger = logging.getLogger("plotting")
         # create an (empty) plot of training convergence, ready to receive data points
         logger.create_plot('training convergence', MultipleSeriesPlot)
-
     try:
         assert numpy.sum(ms_outs) == n_outs
     except AssertionError:
         logger.critical('the summation of multi-stream outputs does not equal to %d' % (n_outs))
         raise
-
     ####parameters#####
     finetune_lr = float(hyper_params['learning_rate'])
     training_epochs = int(hyper_params['training_epochs'])
@@ -154,7 +151,6 @@ def train_DNN(train_xy_file_list, valid_xy_file_list, \
     warmup_momentum = float(hyper_params['warmup_momentum'])
 
     hidden_layer_size = hyper_params['hidden_layer_size']
-
     buffer_utt_size = buffer_size
     early_stop_epoch = int(hyper_params['early_stop_epochs'])
 
@@ -263,24 +259,18 @@ def train_DNN(train_xy_file_list, valid_xy_file_list, \
     logger.info('fine-tuning the %s model' % (model_type))
 
     start_time = time.time()
-
     best_dnn_model = dnn_model
     best_validation_loss = sys.float_info.max
     previous_loss = sys.float_info.max
-
     lr_decay = cfg.lr_decay
     if lr_decay > 0:
         early_stop_epoch *= lr_decay
-
     early_stop = 0
     val_loss_counter = 0
-
     previous_finetune_lr = finetune_lr
-
     epoch = 0
     while (epoch < training_epochs):
         epoch = epoch + 1
-
         if lr_decay == 0:
             # fixed learning rate 
             reduce_lr = False
@@ -303,12 +293,9 @@ def train_DNN(train_xy_file_list, valid_xy_file_list, \
         else:
             current_finetune_lr = previous_finetune_lr
             current_momentum = warmup_momentum
-
         previous_finetune_lr = current_finetune_lr
-
         train_error = []
         sub_start_time = time.time()
-
         logger.debug("training params -- learning rate: %f, early_stop: %d/%d" % (
         current_finetune_lr, early_stop, early_stop_epoch))
         while (not train_data_reader.is_finish()):
@@ -397,11 +384,8 @@ def train_DNN(train_xy_file_list, valid_xy_file_list, \
 def dnn_generation(valid_file_list, nnets_file_name, n_ins, n_outs, out_file_list, reshape_io=False):
     logger = logging.getLogger("dnn_generation")
     logger.debug('Starting dnn_generation')
-
     plotlogger = logging.getLogger("plotting")
-
     dnn_model = pickle.load(open(nnets_file_name, 'rb'))
-
     file_number = len(valid_file_list)
 
     for i in range(file_number):  # file_number

@@ -42,17 +42,14 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.contrib.layers import dropout
 from tensorflow.contrib.layers import fully_connected, batch_norm
-from tensorflow.contrib.rnn import MultiRNNCell, RNNCell, BasicLSTMCell, GRUCell, LayerNormBasicLSTMCell, DropoutWrapper
-from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import init_ops, math_ops
-from tensorflow.python.ops import rnn_cell_impl
-from tensorflow.python.ops import variable_scope as vs
+from tensorflow.contrib.rnn import MultiRNNCell, BasicLSTMCell, GRUCell, LayerNormBasicLSTMCell, DropoutWrapper
+
+from src.base_class.model.LayerNormGRUCell import LayerNormGRUCell
 
 
 class TensorflowModels(object):
     def __init__(self, n_in, hidden_layer_size, n_out, hidden_layer_type, output_type="linear", dropout_rate=0,
                  loss_function="mse", optimizer="adam"):
-
         # self.session=tf.InteractiveSession()
         self.n_in = int(n_in)
         self.n_out = int(n_out)
@@ -81,8 +78,7 @@ class TensorflowModels(object):
             with tf.name_scope("input"):
                 input_layer = tf.placeholder(dtype=tf.float32, shape=(None, self.n_in), name="input_layer")
                 if self.dropout_rate != 0.0:
-                    print
-                    "Using dropout to avoid overfitting and the dropout rate is", self.dropout_rate
+                    print("Using dropout to avoid overfitting and the dropout rate is", self.dropout_rate)
                     is_training_drop = tf.placeholder(dtype=tf.bool, shape=(), name="is_training_drop")
                     input_layer_drop = dropout(input_layer, self.dropout_rate, is_training=is_training_drop)
                     layer_list.append(input_layer_drop)
@@ -90,31 +86,20 @@ class TensorflowModels(object):
                 else:
                     layer_list.append(input_layer)
             g.add_to_collection("input_layer", layer_list[0])
-            for i in xrange(len(self.hidden_layer_size)):
+            for i in range(len(self.hidden_layer_size)):
                 with tf.name_scope("hidden_layer_" + str(i + 1)):
+                    last_layer = layer_list[-1]
+                    if self.hidden_layer_type[i] == "tanh":
+                        new_layer = fully_connected(last_layer, self.hidden_layer_size[i], activation_fn=tf.nn.tanh,
+                                                    normalizer_fn=batch_norm, \
+                                                    normalizer_params=bn_params)
+                    elif self.hidden_layer_type[i] == "sigmoid":
+                        new_layer = fully_connected(last_layer, self.hidden_layer_size[i],
+                                                    activation_fn=tf.nn.sigmoid, normalizer_fn=batch_norm, \
+                                                    normalizer_params=bn_params)
                     if self.dropout_rate != 0.0:
-                        last_layer = layer_list[-1]
-                        if self.hidden_layer_type[i] == "tanh":
-                            new_layer = fully_connected(last_layer, self.hidden_layer_size[i], activation_fn=tf.nn.tanh,
-                                                        normalizer_fn=batch_norm, \
-                                                        normalizer_params=bn_params)
-                        if self.hidden_layer_type[i] == "sigmoid":
-                            new_layer = fully_connected(last_layer, self.hidden_layer_size[i],
-                                                        activation_fn=tf.nn.sigmoid, normalizer_fn=batch_norm, \
-                                                        normalizer_params=bn_params)
-                        new_layer_drop = dropout(new_layer, self.dropout_rate, is_training=is_training_drop)
-                        layer_list.append(new_layer_drop)
-                    else:
-                        last_layer = layer_list[-1]
-                        if self.hidden_layer_type[i] == "tanh":
-                            new_layer = fully_connected(last_layer, self.hidden_layer_size[i], activation_fn=tf.nn.tanh,
-                                                        normalizer_fn=batch_norm, \
-                                                        normalizer_params=bn_params)
-                        if self.hidden_layer_type[i] == "sigmoid":
-                            new_layer = fully_connected(last_layer, self.hidden_layer_size[i],
-                                                        activation_fn=tf.nn.sigmoid, normalizer_fn=batch_norm, \
-                                                        normalizer_params=bn_params)
-                        layer_list.append(new_layer)
+                        new_layer = dropout(new_layer, self.dropout_rate, is_training=is_training_drop)
+                    layer_list.append(new_layer)
             with tf.name_scope("output_layer"):
                 if self.output_type == "linear":
                     output_layer = fully_connected(layer_list[-1], self.n_out, activation_fn=None)
@@ -135,8 +120,7 @@ class TensorflowModels(object):
             with tf.name_scope("input"):
                 input_layer = tf.placeholder(dtype=tf.float32, shape=(None, None, self.n_in), name="input_layer")
                 if self.dropout_rate != 0.0:
-                    print
-                    "Using dropout to avoid overfitting and the dropout rate is", self.dropout_rate
+                    print("Using dropout to avoid overfitting and the dropout rate is", self.dropout_rate)
                     is_training_drop = tf.placeholder(dtype=tf.bool, shape=(), name="is_training_drop")
                     input_layer_drop = dropout(input_layer, self.dropout_rate, is_training=is_training_drop)
                     layer_list.append(input_layer_drop)
@@ -150,7 +134,7 @@ class TensorflowModels(object):
                     is_training_batch = tf.placeholder(dtype=tf.bool, shape=(), name="is_training_batch")
                     bn_params = {"is_training": is_training_batch, "decay": 0.99, "updates_collections": None}
                     g.add_to_collection("is_training_batch", is_training_batch)
-                for i in xrange(len(self.hidden_layer_type)):
+                for i in range(len(self.hidden_layer_type)):
                     if self.dropout_rate != 0.0:
                         if self.hidden_layer_type[i] == "tanh":
                             new_layer = fully_connected(layer_list[-1], self.hidden_layer_size[i],
@@ -255,7 +239,7 @@ class Encoder_Decoder_Models(TensorflowModels):
     def encoder(self, inputs, inputs_sequence_length):
         with tf.variable_scope("encoder"):
             basic_cell = []
-            for i in xrange(len(self.hidden_layer_size)):
+            for i in range(len(self.hidden_layer_size)):
                 if self.hidden_layer_type[i] == "tanh":
                     basic_cell.append(tf.contrib.rnn.BasicRNNCell(num_units=self.encoder_layer_size[i]))
                 if self.hidden_layer_type[i] == "lstm":
@@ -279,7 +263,7 @@ class Encoder_Decoder_Models(TensorflowModels):
         """Memory is a tuple containing the forward and backward final states (output_states_fw,output_states_bw)"""
         with tf.variable_scope("decoder"):
             basic_cell = []
-            for i in xrange(len(self.hidden_layer_size)):
+            for i in range(len(self.hidden_layer_size)):
                 if self.hidden_layer_type[i] == "tanh":
                     basic_cell.append(tf.contrib.rnn.BasicRNNCell(num_units=self.encoder_layer_size[i]))
                 if self.hidden_layer_type[i] == "lstm":
@@ -339,55 +323,3 @@ class Encoder_Decoder_Models(TensorflowModels):
                 if self.optimizer == "adam":
                     self.training_op = tf.train.AdamOptimizer(0.002)
 
-
-def layer_normalization(inputs, epsilon=1e-5, scope=None):
-    mean, var = tf.nn.moments(inputs, [1], keep_dims=True)
-    with tf.variable_scope(scope + "LN", reuse=None):
-        scale = tf.get_variable(name="scale", shape=[inputs.get_shape()[1]], initializer=tf.constant_initializer(1))
-        shift = tf.get_variable(name="shift", shape=[inputs.get_shape()[1]], initializer=tf.constant_initializer(0))
-    LN_output = scale * (inputs - mean) / tf.sqrt(var + epsilon) + shift
-    return LN_output
-
-
-class LayerNormGRUCell(RNNCell):
-    """Gated Recurrent Unit cell (cf. http://arxiv.org/abs/1406.1078)."""
-
-    def __init__(self,
-                 num_units,
-                 activation=None,
-                 reuse=None,
-                 kernel_initializer=None,
-                 bias_initializer=None):
-        super(LayerNormGRUCell, self).__init__(_reuse=reuse)
-        self._num_units = num_units
-        self._activation = activation or math_ops.tanh
-        self._kernel_initializer = kernel_initializer
-        self._bias_initializer = bias_initializer
-
-    @property
-    def state_size(self):
-        return self._num_units
-
-    @property
-    def output_size(self):
-        return self._num_units
-
-    def __call__(self, inputs, state):
-        """Gated recurrent unit (GRU) with nunits cells."""
-        with vs.variable_scope("gates"):  # Reset gate and update gate.
-            # We start with bias of 1.0 to not reset and not update.
-            bias_ones = self._bias_initializer
-            if self._bias_initializer is None:
-                dtype = [a.dtype for a in [inputs, state]][0]
-                bias_ones = init_ops.constant_initializer(1.0, dtype=dtype)
-            value = rnn_cell_impl._linear([inputs, state], 2 * self._num_units, True, bias_ones, \
-                                          self._kernel_initializer)
-            r, u = array_ops.split(value=value, num_or_size_splits=2, axis=1)
-            r, u = layer_normalization(r, scope="r/"), layer_normalization(u, scope="u/")
-            r, u = math_ops.sigmoid(r), math_ops.sigmoid(u)
-        with vs.variable_scope("candidate"):
-            c = self._activation(
-                rnn_cell_impl._linear([inputs, r * state], self._num_units, True, self._bias_initializer,
-                                      self._kernel_initializer))
-        new_h = u * state + (1 - u) * c
-        return new_h, new_h

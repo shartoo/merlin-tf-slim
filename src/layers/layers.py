@@ -39,9 +39,9 @@
 
 
 import logging
+import sys
 
 import numpy
-import sys
 import theano
 import theano.tensor as T
 from theano.ifelse import ifelse
@@ -266,33 +266,24 @@ class GeneralLayer(object):
 
 
 class HiddenLayer(object):
-    def __init__(self, rng, input, n_in, n_out, W=None, b=None,
-                 activation=T.tanh, do_maxout=False, pool_size=1,
+    def __init__(self, rng, input, n_in, n_out, W=None, b=None, activation=T.tanh, do_maxout=False, pool_size=1,
                  do_pnorm=False, pnorm_order=1):
         """ Class for hidden layer """
         self.input = input
         self.n_in = n_in
         self.n_out = n_out
-
         if W is None:
-            W_values = numpy.asarray(rng.normal(0.0, 1.0 / numpy.sqrt(n_in),
-                                                size=(n_in, n_out)), dtype=theano.config.floatX)
-
+            W_values = numpy.asarray(rng.normal(0.0, 1.0 / numpy.sqrt(n_in), size=(n_in, n_out)),
+                                     dtype=theano.config.floatX)
             W = theano.shared(value=W_values, name='W', borrow=True)
-
         if b is None:
             b_values = numpy.zeros((n_out,), dtype=theano.config.floatX)
             b = theano.shared(value=b_values, name='b', borrow=True)
-
         self.W = W
         self.b = b
-
-        self.delta_W = theano.shared(value=numpy.zeros((n_in, n_out),
-                                                       dtype=theano.config.floatX), name='delta_W')
-
-        self.delta_b = theano.shared(value=numpy.zeros_like(self.b.get_value(borrow=True),
-                                                            dtype=theano.config.floatX), name='delta_b')
-
+        self.delta_W = theano.shared(value=numpy.zeros((n_in, n_out), dtype=theano.config.floatX), name='delta_W')
+        self.delta_b = theano.shared(value=numpy.zeros_like(self.b.get_value(borrow=True), dtype=theano.config.floatX),
+                                     name='delta_b')
         lin_output = T.dot(input, self.W) + self.b
         if do_maxout == True:
             self.last_start = n_out - pool_size
@@ -310,11 +301,8 @@ class HiddenLayer(object):
             self.tmp_output = self.tmp_output ** (1.0 / pnorm_order)
             self.output = activation(self.tmp_output)
         else:
-            self.output = (lin_output if activation is None
-                           else activation(lin_output))
-
+            self.output = (lin_output if activation is None else activation(lin_output))
         #        self.output = self.rectifier_linear(lin_output)
-
         # parameters of the model
         self.params = [self.W, self.b]
         self.delta_params = [self.delta_W, self.delta_b]
